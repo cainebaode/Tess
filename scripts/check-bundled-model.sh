@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 cd "${0:A:h:h}"
-mkdir -p .build/checks
+mkdir -p .build/verification/checks .build/cache/CheckModuleCache
 python3 - <<'PY'
 from pathlib import Path
 import plistlib
@@ -52,11 +52,11 @@ source+='''
  }
 }
 '''
-Path('.build/checks/BundleCheck.swift').write_text(source)
-app=Path('.build/checks/BundleCheck.app/Contents');(app/'MacOS').mkdir(parents=True,exist_ok=True);(app/'Resources').mkdir(exist_ok=True)
+Path('.build/verification/checks/BundleCheck.swift').write_text(source)
+app=Path('.build/verification/checks/BundleCheck.app/Contents');(app/'MacOS').mkdir(parents=True,exist_ok=True);(app/'Resources').mkdir(exist_ok=True)
 (app/'Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'life.baode.tess.bundlecheck','CFBundleExecutable':'BundleCheck','CFBundlePackageType':'APPL'}))
 PY
 xcrun swiftc -O -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
-  -module-cache-path .build/checks/ModuleCache .build/checks/BundleCheck.swift \
-  -o .build/checks/BundleCheck.app/Contents/MacOS/BundleCheck
-.build/checks/BundleCheck.app/Contents/MacOS/BundleCheck
+  -module-cache-path .build/cache/CheckModuleCache .build/verification/checks/BundleCheck.swift \
+  -o .build/verification/checks/BundleCheck.app/Contents/MacOS/BundleCheck
+.build/verification/checks/BundleCheck.app/Contents/MacOS/BundleCheck

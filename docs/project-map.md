@@ -1,6 +1,6 @@
 # Tess 项目架构与目录地图
 
-核对日期：2026-10-24。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮不改目录名、不搬迁旧文件。
+核对日期：2026-10-24。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮保留根目录名称，已按功能迁移文档与本机产物，GitHub 仓库名沿用 Faster。
 
 ## 当前项目是什么
 
@@ -26,11 +26,12 @@ flowchart TD
 | `scripts/` | 构建、归档、打包、图标生成和各项检查脚本 | 按本轮任务选用 |
 | `assets/branding/` | 品牌源素材；当前选定方案为 `tess-spirit/` | 修改品牌时使用 |
 | `evidence/` | 按轮次保存的日志、截图、人工反馈、源码及配置快照 | 查证具体构建时使用，不属于应用源码 |
-| `upstream/` | Talkify 与 speech-swift 的上游参考副本 | 研究来源时使用，不是当前应用的直接构建入口 |
-| `.build/` | 编译缓存、依赖、模型、试用包、旧归档、公证导出和检查工具混放 | 需按子目录辨别，不能整体当作可删缓存 |
-| `.cache/` | 另一个历史模块缓存目录 | 一般不需要操作 |
-| `dist/` | 历史交付输出；当前仍为旧 build 14 | 不代表最新安装版 |
-| 根目录日期文档 | 早期 BRD、PRD、优化、安装计划、发布交接及品牌记录 | 查历史依据；其中“当前状态”有时间边界 |
+| `upstream/` | Talkify 与 speech-swift 的上游参考副本，保留在本机 | 研究来源时使用，不参与 GitHub 同步 |
+| `.build/` | 按 cache/local/releases/models/verification/history/tools/logs 分组 | 各类独立存放，见下方清单 |
+| `dist/` | 按版本／build 分组的交付输出；当前仅有旧 build 14 | 不上传 GitHub，不代表最新安装版 |
+| `docs/product/` | BRD、PRD | 查产品依据 |
+| `docs/releases/` | 安装计划、发布进度与验收 | 记录交付过程 |
+| `docs/history/` | 优化、品牌及旧 README 等历史材料 | 旧状态有时间边界 |
 
 ## 应用工程内部
 
@@ -54,9 +55,9 @@ flowchart TD
 | 随包资源 | `Tess/Resources/` | 图标、精灵图片、字体、帮助和第三方许可 |
 | 本地依赖包 | `Tess/Vendor/SpeechSwift/` | 实际参与编译的 AudioCommon、MLXCommon、Qwen3ASR、WhisperASR 等源码 |
 
-实际依赖链：Xcode 工程 → `Tess/Vendor/SpeechSwift/Package.swift` → MLX Swift、Swift Transformers 等 Swift Package 依赖。解析后的检出副本位于 `.build/SourcePackages/`。`upstream/` 只是保留的参考来源，不应误把它的源码改动当作 Tess 已接入。
+实际依赖链：Xcode 工程 → `Tess/Vendor/SpeechSwift/Package.swift` → MLX Swift、Swift Transformers 等 Swift Package 依赖。解析后的检出副本位于 `.build/cache/SourcePackages/`。`upstream/` 只是保留的参考来源，不应误把它的源码改动当作 Tess 已接入。
 
-品牌源素材在 `assets/branding/tess-spirit/`，`scripts/make-icon.swift` 将相应素材生成到 `Tess/Resources/`。基础模型不放进源码资源目录，而是在正式归档时从 `.build/release-models/qwenSmall/` 嵌入 App 的 `Contents/Resources/BaseSpeechModel.tessmodel/`。
+品牌源素材在 `assets/branding/tess-spirit/`，`scripts/make-icon.swift` 将相应素材生成到 `Tess/Resources/`。基础模型不放进源码资源目录，而是在正式归档时从 `.build/models/qwenSmall/` 嵌入 App 的 `Contents/Resources/BaseSpeechModel.tessmodel/`。
 
 ## 用户数据不在项目目录里
 
@@ -70,22 +71,26 @@ flowchart TD
 
 已安装应用为 `/Applications/Tess.app`。项目候选、归档、正式 DMG 和用户数据是不同位置，更新安装不等于重置用户数据。
 
-## 当前为什么显得乱
+## 本机产物与回退
 
-1. **构建目录兼任了版本仓库。** `.build/` 里同时有 DerivedData、SourcePackages、模块缓存、build 14–17 归档、build 18–25 本机候选和回退包；多个 App／归档重复携带基础模型。
-2. **历史状态散在多份文档。** 根目录日期文件、README 更新段落和验收记录分别保留了不同时间的状态，旧的“当前版本”没有统一导航。
-3. **开发输出和交付输出共用固定路径。** `scripts/build.sh` 会写 `dist`，归档和 DMG 脚本也有固定路径，因此单看文件名不足以判断版本。
-4. **尚未建立 Git 仓库。** 目录有 `.gitignore`，但当前不是 Git 工作区，历史源码主要依靠 `evidence/` 和 `.build/` 内的快照留存。
+| 位置 | 内容 |
+| --- | --- |
+| `.build/local/0.2.0-build25/Tess.app` | 与当前本机版本对应的完整候选 |
+| `.build/local/0.2.0-build24/Tess.app` | 紧邻回退 |
+| `.build/local/0.2.0-build21/Tess.app` | 用户曾确认整体可用的早期截图版 |
+| `.build/releases/0.2.0-build14/` 至 `build17/` | 历史正式归档及相应公证导出，不能概括为都已公证 |
+| `.build/history/` | 其余旧候选、备份、源码快照与旧打包暂存，保留未删 |
+| `.build/cache/` | 当前编译与依赖缓存；迁移前预编译缓存在 `legacy/`，因包含绝对路径而单独留存 |
+| `.build/models/` | 经校验的基础模型权重 |
+| `.build/verification/` | 隔离检查、验收和诊断资料 |
+| `.build/tools/release/` | 历史发行工具；当前公证配置已纳入 `scripts/release/` |
+| `.build/logs/` | 历史构建与启动日志 |
+| `dist/0.2.0-build14/` | 旧 App、DMG、摘要，有已知输入故障；本轮未生成新正式包 |
 
-本次目录大小统计约为：`.build/` 18 GB、`dist/` 1.3 GB、`evidence/` 340 MB、`upstream/` 84 MB、`assets/` 18 MB、`Tess/` 2.1 MB。另有约 240 MB 的 `.cache/ModuleCache/`。这是当前 `du` 的目录统计，含历史副本和文件克隆，不等同于实际可释放的独占磁盘空间。
+项目已建立 Git main 分支和私有 GitHub 远端。整理前源码标签 `local-build25-baseline` 可用于查看当时的代码与目录；Git 不包含本机二进制和原始验收资料。GitHub 同步源码、必要品牌资源、文档、脚本、锁定依赖和公开校验清单。
 
-## 从现在开始如何保持清楚
-
-- 只通过 README 进入当前状态、固定流程和架构地图；根目录日期文档保留历史，不继续重复维护多套长期流程。
-- 新本机包、新归档和新正式包按版本／build 分目录，位置约定见 [迭代与发布流程](iteration-and-release.md#产物位置约定)。旧目录尚未搬迁，脚本固定路径也尚未调整。
-- `.build/release-models/`、`.build/release-tools/`、有效归档及尚需回退的候选不能与可重建编译缓存混同处理。
-- 后续整理可先补 Git 版本管理，再逐项归并历史归档与重复候选，最后处理明确可重建的缓存；现阶段没有移动或删除这些文件，也没有开始 Git 初始化或远端同步。
+原始 `evidence/` 可能包含配置快照及桌面材料，因此仅在本机保留。上游参考、缓存、模型和安装包也不上传。整理范围及旧路径定位见 [整理记录](workspace-organization.md) 和 [完整路径映射](workspace-layout.json)。
 
 ## 版本核对快照
 
-2026-10-24 核对：源码与本机应用为 `0.2.0 build 25`；`dist/Tess.app` 为 build 14，旧 DMG 仍对应 build 14。最新原位截图的人工验收尚无确认记录。本文件仅解释结构，后续版本状态以 README 最新核对和对应验收证据为准。
+2026-10-24 核对：源码与本机应用为 `0.2.0 build 25`；`dist/0.2.0-build14/Tess.app` 与同目录旧 DMG 仍对应 build 14。最新原位截图的人工验收尚无确认记录。本文件仅解释结构，后续版本状态以 README 最新核对和对应验收证据为准。

@@ -18,7 +18,7 @@ import Foundation
     precondition(TextService.outputIssue(original: String(repeating: "保留已说明的工作内容", count: 12), candidate: "整理工作内容。") != nil)
     let raw = await TextService().process("不要发布", mode: .raw, configuration: nil)
     precondition(raw.output == "不要发布" && raw.error == nil)
-    let scratch = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/checks/config-\(UUID())", isDirectory: true)
+    let scratch = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/verification/checks/config-\(UUID())", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: scratch) }
     let store = APIConfigurationStore(storageDirectory: scratch)
     var configuration = APIPreset.all.first { $0.id == "ollama" }!.configuration()

@@ -1,8 +1,8 @@
 # Tess 离线安装包验收记录
 
-2026-10-24 最新状态：源码及本机应用为 **0.2.0 build 25**，包含原位截图和默认方框标注。构建、签名及本机安装完成，最新截图操作由用户人工验收，尚未收到通过反馈；新正式归档、公证、DMG 和最终包安装验收尚未完成。`dist` 仍为旧 build 14。后续按 [迭代与发布流程](docs/iteration-and-release.md) 执行；下文 build 20、17、14 等结论保留为对应版本的历史证据。
+2026-10-24 最新状态：源码及本机应用为 **0.2.0 build 25**，包含原位截图和默认方框标注。构建、签名及本机安装完成，最新截图操作由用户人工验收，尚未收到通过反馈；新正式归档、公证、DMG 和最终包安装验收尚未完成。`dist` 仍为旧 build 14。后续按 [迭代与发布流程](../iteration-and-release.md) 执行；下文 build 20、17、14 等结论保留为对应版本的历史证据。
 
-2026-10-24 更新。Apple Silicon，macOS 26 或更新版本。本机 `/Applications/Tess.app` 已更新为 **0.2.0 build 20** 绿色精灵 + Humanist 视觉版；安装签名、构建产物一致性、设置保留、基础离线模型及主要窗口核对通过。build 17 真人使用验收保留为既有证据，本轮未重复真人录音。正式公证与新 DMG 继续暂缓，dist 仍为旧 build 14。详见 [品牌更新记录](20261024-01-tess-brand-refresh.md)。 build 19 已移除正常界面中的 Talkify 标注，原版权与许可文本仍随包保留。 build 20 为状态栏精灵增加细深绿描边。
+2026-10-24 更新。Apple Silicon，macOS 26 或更新版本。本机 `/Applications/Tess.app` 已更新为 **0.2.0 build 20** 绿色精灵 + Humanist 视觉版；安装签名、构建产物一致性、设置保留、基础离线模型及主要窗口核对通过。build 17 真人使用验收保留为既有证据，本轮未重复真人录音。正式公证与新 DMG 继续暂缓，dist 仍为旧 build 14。详见 [品牌更新记录](../history/20261024-01-tess-brand-refresh.md)。 build 19 已移除正常界面中的 Talkify 标注，原版权与许可文本仍随包保留。 build 20 为状态栏精灵增加细深绿描边。
 
 ## build 17 本机实际验收
 
@@ -21,7 +21,7 @@
 
 ## 旧 build 14 安装包（有已知输入故障，非最终交付）
 
-- [Tess 离线安装包](dist/Tess-0.2.0-arm64.dmg)，617,186,356 字节，约 617 MB。
+- [Tess 离线安装包](../../dist/0.2.0-build14/Tess-0.2.0-arm64.dmg)，617,186,356 字节，约 617 MB。
 - SHA-256：`f83cfc1f5f1d8fdd6c543764da491c8db3f2d06bacb1645b321dbea4749dbf49`。
 - 打开 DMG，将 Tess 拖入 Applications，再从“应用程序”启动。
 - 基础 Qwen3-ASR 0.6B 模型随应用提供；基础听写无需额外下载、账号或 API Key。首次使用按引导授予麦克风和辅助功能。截图权限在首次使用截图时申请。
@@ -68,9 +68,9 @@
 
 ## 证据
 
-build 14 历史发行证据位于 [2026-10-20 证据目录](evidence/20261020-03-release)：`payload-audit.json`、`notary-offline-resume.log`、`notarized-offline-export.log`、`dmg-offline.log`、`browser-download.json`、`installation.json`、`included-model-asr.json` 和 `release-verification.json`。
+build 14 历史发行证据位于 [2026-10-20 证据目录](../../evidence/20261020-03-release)：`payload-audit.json`、`notary-offline-resume.log`、`notarized-offline-export.log`、`dmg-offline.log`、`browser-download.json`、`installation.json`、`included-model-asr.json` 和 `release-verification.json`。
 
-build 15 本轮证据位于 [2026-10-23 证据目录](evidence/20261023-build15)：`archive-candidate.json`、`textedit-live-delivery.json`、`physical-fn-textedit.json`、`browser-and-chat-status.json`、`input-metadata-1792767351.040179.json`、`review-and-regression.md` 及 `wechat-input-method-research.md`。最后一份微信元数据补充了汇总文件中尚待检查的 system focus 结果。构建、签名、公证与隔离回归不能替代真实使用验收。
+build 15 本轮证据位于 [2026-10-23 证据目录](../../evidence/20261023-build15)：`archive-candidate.json`、`textedit-live-delivery.json`、`physical-fn-textedit.json`、`browser-and-chat-status.json`、`input-metadata-1792767351.040179.json`、`review-and-regression.md` 及 `wechat-input-method-research.md`。最后一份微信元数据补充了汇总文件中尚待检查的 system focus 结果。构建、签名、公证与隔离回归不能替代真实使用验收。
 
 
-build 17 本机与归档证据见 [2026-10-23 build17 目录](evidence/20261023-build17)，以 `acceptance-status.json` 和各真人验收记录为当前状态。正式发行已按用户要求暂缓。
+build 17 本机与归档证据见 [2026-10-23 build17 目录](../../evidence/20261023-build17)，以 `acceptance-status.json` 和各真人验收记录为当前状态。正式发行已按用户要求暂缓。

@@ -2,7 +2,7 @@
 set -euo pipefail
 task_root="${0:A:h:h}"
 cd "$task_root"
-mkdir -p .build/checks
+mkdir -p .build/verification/checks .build/cache/CheckModuleCache
 # Real capture/service code with a deliberately slow, cancellation-ignoring
 # model substitute. No microphone, network, model weights, or user preferences.
 python3 - <<'PY'
@@ -156,9 +156,9 @@ source += '''
     }
 }
 '''
-Path(".build/checks/LiveTranscriptionCheck.swift").write_text(source)
+Path(".build/verification/checks/LiveTranscriptionCheck.swift").write_text(source)
 PY
 xcrun swiftc -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
-  -module-cache-path .build/checks/ModuleCache \
-  Tess/Sources/AudioLevelMeter.swift .build/checks/LiveTranscriptionCheck.swift -o .build/checks/live-transcription-check
-.build/checks/live-transcription-check
+  -module-cache-path .build/cache/CheckModuleCache \
+  Tess/Sources/AudioLevelMeter.swift .build/verification/checks/LiveTranscriptionCheck.swift -o .build/verification/checks/live-transcription-check
+.build/verification/checks/live-transcription-check

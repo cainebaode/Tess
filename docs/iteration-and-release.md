@@ -21,7 +21,7 @@
 4. 本机候选放入独立构建目录，沿用原应用标识、签名身份和离线资源，退出旧进程后覆盖安装到 `/Applications/Tess.app`。
 5. 告知用户本轮变化、安装版本及待人工确认项。没有真人反馈时，只记录“已安装，待人工验收”。
 
-不要重置设置、权限、模型或引导进度。当前 `scripts/build.sh` 会覆盖 `dist/Tess.app` 并生成 ZIP，默认使用临时签名，也不负责正式离线模型嵌入；它不是日常本机更新或正式交付的默认路径。
+不要重置设置、权限、模型或引导进度。`scripts/build.sh` 现在只将开发 App、ZIP 和日志写入 `.build/local/<version>-build<build>/development/`，不覆盖 `dist` 或已保留的完整候选。它默认临时签名，不负责正式离线模型嵌入或本机安装；正式交付仍走归档、公证和 DMG 流程。
 
 ## 2. 用户人工验收
 
@@ -39,7 +39,7 @@
 
 - **公开版本号**：小修复通常按 `0.2.0 → 0.2.1`；明显功能更新可按 `0.2.x → 0.3.0`。这是版本命名约定，不要求每轮本机迭代都改变公开版本号。
 - **构建号 build**：每次安装新构建递增，不复用一个 build 指代不同代码。
-- 保存最终源码快照、版本信息、必要验收结果及对应候选应用。当前项目尚未建立 Git 仓库，因此不能把某个不存在的提交或 tag 当作源码依据；以后接入 Git 后可用提交／tag 定位源码。
+- 保存最终源码快照、版本信息、必要验收结果及对应候选应用。当前已建立 Git main 分支并连接私有 GitHub 仓库，冻结版本以实际提交定位。整理前源码基线标签为 `local-build25-baseline`；App、模型与原始证据继续在本机单独保留。
 - 冻结后若再修复代码，递增 build，重新生成对应归档、公证结果和安装包，并复核受影响行为。
 
 ## 4. 正式离线归档与公证
@@ -47,7 +47,7 @@
 1. 从冻结源码执行 `scripts/archive-release.sh`，核对固定公开版本模型的完整摘要、许可和来源；正式包包含基础离线模型。
 2. 检查最终载荷的版本、Bundle ID、品牌及帮助文件；不得带入用户配置、凭据、录音、截图、诊断应用或内部测试入口。
 3. 核对正式 Developer ID、Hardened Runtime 和时间戳。直接重新签名本机试用包不代替正式源码归档。
-4. 使用现有 Xcode 登录及 `.build/release-tools/ExportOptions.plist` 完成 Apple 公证和明确目录导出。登录失效时，由用户在 Apple 窗口亲自恢复，不索取密码。
+4. 使用现有 Xcode 登录及 `scripts/release/ExportOptions.plist` 完成 Apple 公证和明确目录导出。登录失效时，由用户在 Apple 窗口亲自恢复，不索取密码。
 5. 用户已授权完整应用、公开离线模型及必要分发容器上传 Apple 公证服务，沿用该范围，无需重复询问。
 
 旧构建的公证结果不迁移到新构建；审计工具若写死旧版本或路径，必须先针对本轮实际产物调整。
@@ -62,25 +62,26 @@
 
 ## 产物位置约定
 
-以下是**后续新产物的组织约定**，不是当前全部已经落地的目录；不自动搬迁旧文件。
+以下目录已在本轮整理中落地；旧文件的新位置见 [路径映射](workspace-layout.json)。
 
 | 类型 | 约定位置 |
 | --- | --- |
-| 本机候选 | `.build/local/<version>-build<build>/Tess.app` |
+| 保留的完整本机候选 | `.build/local/<version>-build<build>/Tess.app` |
+| 开发构建、ZIP 与日志 | `.build/local/<version>-build<build>/development/` |
 | 正式归档、公证导出及打包暂存 | `.build/releases/<version>-build<build>/`，内部区分 `archive`、`notary-export`、`notarized`、`stage` |
 | 完成交付的 App、DMG、摘要和说明 | `dist/<version>-build<build>/` |
 | 本轮日志、源码依据及人工反馈 | `evidence/YYYYMMDD-topic/` |
-| 经校验的基础模型源 | `.build/release-models/qwenSmall/`，沿用当前输入位置 |
+| 经校验的基础模型源 | `.build/models/qwenSmall/`，权重只在本机保留 |
 
-目前归档脚本仍写死 `.build/Tess-0.2.0.xcarchive`，打包脚本仍写死 `.build/dmg-stage` 和 `dist/Tess-<version>-arm64.dmg`。下次正式交付时，应先做最小的输出路径调整或保护旧产物；不能仅凭本流程的目录约定，假定脚本已完成参数化。
+脚本已按源码或输入 App 的实际版本／build 输出：归档为 `.build/releases/<version>-build<build>/archive/Tess.xcarchive`；公证 App 从同版本 `notarized/Tess.app` 读取；DMG 与摘要写入对应 `dist/<version>-build<build>/`。已有归档不会被自动覆盖。缓存统一在 `.build/cache/`，检查程序在 `.build/verification/`。
 
 ## 记录与状态
 
 - `README.md`：当前核对状态和工作入口。
 - 本文件：长期迭代与发布规则，不逐轮堆叠日志。
 - `docs/project-map.md`：目录和代码架构，以实际工程结构为准。
-- `20261020-03-tess-release-progress.md`：正式交付过程与交接记录。
-- `20261020-04-tess-installer-acceptance.md`：各构建的安装及人工验收结论。
+- `docs/releases/20261020-03-tess-release-progress.md`：正式交付过程与交接记录。
+- `docs/releases/20261020-04-tess-installer-acceptance.md`：各构建的安装及人工验收结论。
 - 对应 `evidence/` 子目录：详细技术日志、源码快照和用户反馈。
 
 分别记录“构建通过”“本机已安装”“人工已确认”“公证通过”“最终包已交付”。完成技术检查不能替代用户实际验收。维护记录时保留历史版本，明确最新记录覆盖哪些旧状态。

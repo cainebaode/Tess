@@ -1,0 +1,241 @@
+{
+  "organized_on": "2026-10-24",
+  "baseline_tag": "local-build25-baseline",
+  "installed_application": "/Applications/Tess.app",
+  "retained_local_builds": [
+    25,
+    24,
+    21
+  ],
+  "moves": [
+    {
+      "from": ".build/checks/ModuleCache",
+      "to": ".build/cache/legacy/CheckModuleCache-before-layout"
+    },
+    {
+      "from": ".build/hotkey-check/ModuleCache",
+      "to": ".build/cache/legacy/HotkeyModuleCache-before-layout"
+    },
+    {
+      "from": ".build/DerivedData",
+      "to": ".build/cache/legacy/DerivedData-before-layout"
+    },
+    {
+      "from": ".build/SourcePackages",
+      "to": ".build/cache/SourcePackages"
+    },
+    {
+      "from": ".build/SwiftModuleCache",
+      "to": ".build/cache/legacy/SwiftModuleCache-before-layout"
+    },
+    {
+      "from": ".build/ModuleCache",
+      "to": ".build/cache/legacy/ModuleCache-before-layout"
+    },
+    {
+      "from": ".build/HUDTypecheck",
+      "to": ".build/cache/legacy/HUDTypecheck-before-layout"
+    },
+    {
+      "from": ".build/Tess.iconset",
+      "to": ".build/cache/Tess.iconset"
+    },
+    {
+      "from": ".cache",
+      "to": ".build/cache/LegacyCache"
+    },
+    {
+      "from": ".build/checks",
+      "to": ".build/verification/checks"
+    },
+    {
+      "from": ".build/hotkey-check",
+      "to": ".build/verification/hotkeys"
+    },
+    {
+      "from": ".build/icon-smoke",
+      "to": ".build/verification/icon-smoke"
+    },
+    {
+      "from": ".build/acceptance",
+      "to": ".build/verification/acceptance"
+    },
+    {
+      "from": ".build/acceptance-build15",
+      "to": ".build/verification/acceptance-build15"
+    },
+    {
+      "from": ".build/target-diagnosis",
+      "to": ".build/verification/target-diagnosis"
+    },
+    {
+      "from": ".build/Tess-build25.app",
+      "to": ".build/local/0.2.0-build25/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build24.app",
+      "to": ".build/local/0.2.0-build24/Tess.app"
+    },
+    {
+      "from": ".build/local-screenshot21/Tess.app",
+      "to": ".build/local/0.2.0-build21/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build21-backup.app",
+      "to": ".build/history/local-builds/build21-backup/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build22-backup.app",
+      "to": ".build/history/local-builds/build22-backup/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build22.app",
+      "to": ".build/history/local-builds/build22/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build23-backup.app",
+      "to": ".build/history/local-builds/build23-backup/Tess.app"
+    },
+    {
+      "from": ".build/Tess-build23.app",
+      "to": ".build/history/local-builds/build23/Tess.app"
+    },
+    {
+      "from": ".build/local-brand18",
+      "to": ".build/history/local-builds/build18"
+    },
+    {
+      "from": ".build/local-brand19",
+      "to": ".build/history/local-builds/build19"
+    },
+    {
+      "from": ".build/local-brand20",
+      "to": ".build/history/local-builds/build20"
+    },
+    {
+      "from": ".build/local-screenshot21",
+      "to": ".build/history/local-builds/build21-notes"
+    },
+    {
+      "from": ".build/Tess-0.2.0-build14.xcarchive",
+      "to": ".build/releases/0.2.0-build14/archive/Tess.xcarchive"
+    },
+    {
+      "from": ".build/Tess-0.2.0-build15.xcarchive",
+      "to": ".build/releases/0.2.0-build15/archive/Tess.xcarchive"
+    },
+    {
+      "from": ".build/Tess-0.2.0-build16.xcarchive",
+      "to": ".build/releases/0.2.0-build16/archive/Tess.xcarchive"
+    },
+    {
+      "from": ".build/Tess-0.2.0-build17.xcarchive",
+      "to": ".build/releases/0.2.0-build17/archive/Tess.xcarchive"
+    },
+    {
+      "from": ".build/Tess-0.2.0-build17-before-copy-update.xcarchive",
+      "to": ".build/history/archives/build17-before-copy-update.xcarchive"
+    },
+    {
+      "from": ".build/notarized-offline",
+      "to": ".build/releases/0.2.0-build14/notarized"
+    },
+    {
+      "from": ".build/notarized",
+      "to": ".build/releases/0.2.0-build13/notarized"
+    },
+    {
+      "from": ".build/dmg-stage",
+      "to": ".build/history/staging/build14-dmg-stage"
+    },
+    {
+      "from": ".build/release-models",
+      "to": ".build/models"
+    },
+    {
+      "from": ".build/release-tools",
+      "to": ".build/tools/release"
+    },
+    {
+      "from": ".build/change-backup-build8",
+      "to": ".build/history/source-snapshots/change-backup-build8"
+    },
+    {
+      "from": ".build/review-build8",
+      "to": ".build/history/source-snapshots/review-build8"
+    },
+    {
+      "from": ".build/UIASRStub.swift",
+      "to": ".build/history/diagnostics/UIASRStub.swift"
+    },
+    {
+      "from": ".build/tess-text-check",
+      "to": ".build/verification/checks/tess-text-check"
+    },
+    {
+      "from": ".build/launch.log",
+      "to": ".build/logs/launch.log"
+    },
+    {
+      "from": ".build/metal-install.log",
+      "to": ".build/logs/metal-install.log"
+    },
+    {
+      "from": ".build/build.log",
+      "to": ".build/logs/build-before-organization.log"
+    },
+    {
+      "from": ".build-resolve.log",
+      "to": ".build/logs/package-resolve-before-organization.log"
+    },
+    {
+      "from": "dist/Tess.app",
+      "to": "dist/0.2.0-build14/Tess.app"
+    },
+    {
+      "from": "dist/Tess-0.2.0-arm64.dmg",
+      "to": "dist/0.2.0-build14/Tess-0.2.0-arm64.dmg"
+    },
+    {
+      "from": "dist/Tess-0.2.0-arm64.dmg.sha256",
+      "to": "dist/0.2.0-build14/Tess-0.2.0-arm64.dmg.sha256"
+    },
+    {
+      "from": "20261007-01-faster-brd.md",
+      "to": "docs/product/20261007-01-faster-brd.md"
+    },
+    {
+      "from": "20261007-02-tess-prd.md",
+      "to": "docs/product/20261007-02-tess-prd.md"
+    },
+    {
+      "from": "20261008-03-tess-delivery.md",
+      "to": "docs/history/20261008-03-tess-delivery.md"
+    },
+    {
+      "from": "20261011-01-tess-optimization.md",
+      "to": "docs/history/20261011-01-tess-optimization.md"
+    },
+    {
+      "from": "20261020-01-tess-ux-acceptance.md",
+      "to": "docs/history/20261020-01-tess-ux-acceptance.md"
+    },
+    {
+      "from": "20261020-02-tess-installation-plan.md",
+      "to": "docs/releases/20261020-02-tess-installation-plan.md"
+    },
+    {
+      "from": "20261020-03-tess-release-progress.md",
+      "to": "docs/releases/20261020-03-tess-release-progress.md"
+    },
+    {
+      "from": "20261020-04-tess-installer-acceptance.md",
+      "to": "docs/releases/20261020-04-tess-installer-acceptance.md"
+    },
+    {
+      "from": "20261024-01-tess-brand-refresh.md",
+      "to": "docs/history/20261024-01-tess-brand-refresh.md"
+    }
+  ],
+  "cache_note": "Precompiled caches contain absolute paths. Previous caches are retained under .build/cache/legacy; active caches are rebuilt in .build/cache."
+}

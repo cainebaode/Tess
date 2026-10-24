@@ -3,7 +3,7 @@ set -euo pipefail
 task_root="${0:A:h:h}"
 cd "$task_root"
 identity="${TESS_SIGNING_IDENTITY:-Developer ID Application: Caine Chen (9D6XC2T2G5)}"
-model_folder="${TESS_RELEASE_MODEL_DIRECTORY:-$task_root/.build/release-models/qwenSmall}"
+model_folder="${TESS_RELEASE_MODEL_DIRECTORY:-$task_root/.build/models/qwenSmall}"
 [[ -f "$model_folder/.tess-verified.json" ]] || { print -u2 'A verified base speech model is required for the offline release.'; exit 1; }
 python3 - "$model_folder" <<'PY'
 import hashlib,json,sys
@@ -20,17 +20,22 @@ for file in receipt['files']:
  assert digest.hexdigest()==file['digest'],file['path']
 print('Base speech model hashes verified:',receipt['revision'])
 PY
-mkdir -p .build
-xcrun swift -module-cache-path .build/SwiftModuleCache scripts/make-icon.swift \
-  assets/branding/tess-spirit/tess-mascot.png Tess/Resources .build/Tess.iconset \
+version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Tess/Info.plist)
+build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Tess/Info.plist)
+release_root="$task_root/.build/releases/${version}-build${build}"
+archive_path="$release_root/archive/Tess.xcarchive"
+[[ ! -e "$archive_path" ]] || { print -u2 "Archive already exists; preserve it before rebuilding: $archive_path"; exit 1; }
+mkdir -p "$release_root/archive" .build/cache
+xcrun swift -module-cache-path .build/cache/SwiftModuleCache scripts/make-icon.swift \
+  assets/branding/tess-spirit/tess-mascot.png Tess/Resources .build/cache/Tess.iconset \
   assets/branding/tess-spirit
-iconutil -c icns .build/Tess.iconset -o Tess/Resources/Tess.icns
+iconutil -c icns .build/cache/Tess.iconset -o Tess/Resources/Tess.icns
 xcodebuild -project Tess/Tess.xcodeproj -scheme Tess -configuration Release \
   -destination 'generic/platform=macOS' ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-  -derivedDataPath .build/DerivedData -clonedSourcePackagesDirPath .build/SourcePackages \
-  -archivePath .build/Tess-0.2.0.xcarchive CODE_SIGN_STYLE=Manual \
+  -derivedDataPath .build/cache/DerivedData -clonedSourcePackagesDirPath .build/cache/SourcePackages \
+  -archivePath "$archive_path" CODE_SIGN_STYLE=Manual \
   "CODE_SIGN_IDENTITY=$identity" DEVELOPMENT_TEAM=9D6XC2T2G5 ENABLE_HARDENED_RUNTIME=YES archive
-archive_app="$task_root/.build/Tess-0.2.0.xcarchive/Products/Applications/Tess.app"
+archive_app="$archive_path/Products/Applications/Tess.app"
 ditto "$model_folder" "$archive_app/Contents/Resources/BaseSpeechModel.tessmodel"
 chmod -R a+rX "$archive_app/Contents/Resources/BaseSpeechModel.tessmodel"
 codesign --force --options runtime --timestamp --entitlements Tess/Tess.entitlements --sign "$identity" "$archive_app"

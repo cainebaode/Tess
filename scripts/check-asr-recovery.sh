@@ -2,7 +2,7 @@
 set -euo pipefail
 task_root="${0:A:h:h}"
 cd "$task_root"
-mkdir -p .build/checks
+mkdir -p .build/verification/checks .build/cache/CheckModuleCache
 # Execute the actual service and receipt validator with only the model loader
 # replaced by a deterministic failing actor. No weights, network, or user state.
 python3 - <<'PY'
@@ -58,9 +58,9 @@ source += '''
     }
 }
 '''
-Path(".build/checks/ASRRecoveryCheck.swift").write_text(source)
+Path(".build/verification/checks/ASRRecoveryCheck.swift").write_text(source)
 PY
 xcrun swiftc -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
-  -module-cache-path .build/checks/ModuleCache \
-  Tess/Sources/AudioLevelMeter.swift Tess/Sources/AudioRecorder.swift .build/checks/ASRRecoveryCheck.swift -o .build/checks/asr-recovery-check
-.build/checks/asr-recovery-check
+  -module-cache-path .build/cache/CheckModuleCache \
+  Tess/Sources/AudioLevelMeter.swift Tess/Sources/AudioRecorder.swift .build/verification/checks/ASRRecoveryCheck.swift -o .build/verification/checks/asr-recovery-check
+.build/verification/checks/asr-recovery-check

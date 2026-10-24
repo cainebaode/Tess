@@ -2,7 +2,7 @@
 set -euo pipefail
 task_root="${0:A:h:h}"
 cd "$task_root"
-mkdir -p .build/checks
+mkdir -p .build/verification/checks .build/cache/CheckModuleCache
 # Explicit offline model/corpus arguments; never opens a microphone or user settings.
 # Usage: zsh scripts/check-live-asr.sh /absolute/Models /absolute/quality /absolute/report.json
 python3 - "$@" <<'PY'
@@ -13,8 +13,8 @@ import sys
 if len(sys.argv) != 4 or not all(Path(value).is_absolute() for value in sys.argv[1:]):
     raise SystemExit("Provide absolute model root, synthetic corpus folder, and report path.")
 root = Path.cwd()
-products = root / ".build/DerivedData/Build/Products/Release"
-source = root / ".build/checks/LiveASRCheck.swift"
+products = root / ".build/cache/DerivedData/Build/Products/Release"
+source = root / ".build/verification/checks/LiveASRCheck.swift"
 source.write_text(r'''
 import AVFoundation
 import Foundation
@@ -87,16 +87,16 @@ import Foundation
     }
 }
 ''')
-binary = root / ".build/checks/live-asr-check"
+binary = root / ".build/verification/checks/live-asr-check"
 cmd = ["xcrun", "swiftc", "-O", "-swift-version", "6", "-strict-concurrency=complete", "-parse-as-library",
-       "-target", "arm64-apple-macos26.0", "-module-cache-path", str(root / ".build/checks/ModuleCache"),
+       "-target", "arm64-apple-macos26.0", "-module-cache-path", str(root / ".build/cache/CheckModuleCache"),
        "-I", str(products)]
-for modulemap in [root / ".build/SourcePackages/checkouts/swift-numerics/Sources/_NumericsShims/include/module.modulemap",
-                  root / ".build/SourcePackages/checkouts/mlx-swift/Source/Cmlx/include/module.modulemap",
-                  root / ".build/DerivedData/Build/Intermediates.noindex/GeneratedModuleMaps/yyjson.modulemap"]:
+for modulemap in [root / ".build/cache/SourcePackages/checkouts/swift-numerics/Sources/_NumericsShims/include/module.modulemap",
+                  root / ".build/cache/SourcePackages/checkouts/mlx-swift/Source/Cmlx/include/module.modulemap",
+                  root / ".build/cache/DerivedData/Build/Intermediates.noindex/GeneratedModuleMaps/yyjson.modulemap"]:
     cmd += ["-Xcc", "-fmodule-map-file=" + str(modulemap)]
 for headers in ["swift-numerics/Sources/_NumericsShims/include", "mlx-swift/Source/Cmlx/include", "yyjson/src"]:
-    cmd += ["-Xcc", "-I" + str(root / ".build/SourcePackages/checkouts" / headers)]
+    cmd += ["-Xcc", "-I" + str(root / ".build/cache/SourcePackages/checkouts" / headers)]
 cmd += [str(root / "Tess/Sources" / name) for name in ["ASRService.swift", "AudioRecorder.swift", "AudioLevelMeter.swift"]]
 cmd += [str(source)] + [str(path) for path in sorted(products.glob("*.o"))]
 cmd += ["-lc++", "-framework", "Metal", "-framework", "Accelerate", "-o", str(binary)]

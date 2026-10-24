@@ -7,3 +7,4 @@
 - 保留 Bundle ID、签名身份、用户设置、权限、模型和引导进度。桌面操作使用 CUA。
 - 版本及产物状态先核对实际文件。日期文档和旧证据只代表对应版本，不因目录名为 `dist` 就认定是最新包。
 - 长期流程只维护在流程文档中；README 保留当前状态和导航，具体日志与验收证据放入对应记录。用户后续明确的新指令优先。
+- GitHub 私有仓库为 `cainebaode/Faster`，默认分支 `main`。仅同步源码、必要资源、文档与脚本；原始 evidence、用户配置、模型权重、App／DMG、缓存和上游参考副本保留本机。目录位置见 `docs/project-map.md`，旧路径见 `docs/workspace-layout.json`。

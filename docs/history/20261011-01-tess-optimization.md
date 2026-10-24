@@ -1,14 +1,14 @@
 # Tess 产品优化与验收
 
-日期：2026-10-11。唯一主计划；当前基线 0.1.0 / build 8。本目录没有 Git 元数据，改动前源码保存在 [快照](evidence/20261011-01/source-build8.tar.gz)。
+日期：2026-10-11。唯一主计划；当前基线 0.1.0 / build 8。本目录没有 Git 元数据，改动前源码保存在 [快照](../../evidence/20261011-01/source-build8.tar.gz)。
 
 ## 范围与证据
 
 保留菜单栏定位、像素形象、深色与蓝色主调、本地 ASR、自配文字服务、四种模式快捷键、会话固定目标/模式、取消及迟到保护、原文回退、目标无效时复制。研究、隔离预览、真实系统验收分别记录。未读取个人正文、录音、截图或密钥。
 
-方法索引：[TimeBack 方法](../TimeBackV2/v2-rebuild/development-methods/README.md)及其两份指南/模板；Faster build 8 的模式与安全交付决定以现行 PRD 和源码复核。TimeBack 的实际画面和回调检查方法可迁移，外观数值不迁移；Zzz 的构建/安装不替代真实系统验收原则适用。本轮不需要逐字读取其他历史聊天。
+方法索引：TimeBack 方法（其他项目的历史参考，未随本仓库提供）及其两份指南/模板；Faster build 8 的模式与安全交付决定以现行 PRD 和源码复核。TimeBack 的实际画面和回调检查方法可迁移，外观数值不迁移；Zzz 的构建/安装不替代真实系统验收原则适用。本轮不需要逐字读取其他历史聊天。
 
-实际基线：已在本项目 `.runtime/20261011-baseline` 隔离目录运行 build 8；使用明确的隔离文字，完成手动输入→原文预览。实际窗口证据：[有内容结果页](evidence/20261011-01/before/result-window.png)、[通用设置](evidence/20261011-01/before/general-window.png)、[语音设置](evidence/20261011-01/before/speech-window.png)、[空 API 表单](evidence/20261011-01/before/api-window.png)。录音 HUD 的旧 smoke 位图只设置了文字，**不是录音链路证据**。
+实际基线：已在本项目 `.runtime/20261011-baseline` 隔离目录运行 build 8；使用明确的隔离文字，完成手动输入→原文预览。实际窗口证据：[有内容结果页](../../evidence/20261011-01/before/result-window.png)、[通用设置](../../evidence/20261011-01/before/general-window.png)、[语音设置](../../evidence/20261011-01/before/speech-window.png)、[空 API 表单](../../evidence/20261011-01/before/api-window.png)。录音 HUD 的旧 smoke 位图只设置了文字，**不是录音链路证据**。
 
 ## 顺序与分工
 
@@ -36,7 +36,7 @@
 
 ## 构建 9 交付结果
 
-**已接入正式应用**：连续原生浮层、真实近期音量与静音反馈、存储恢复、截图缺失状态、模型加载失败复试、配置测试引导、键盘快捷键录入及版本显示。正式包是 [Tess.app](dist/Tess.app)，[ZIP](dist/Tess-0.1.0.zip)；版本 0.1.0 / build 9，本机临时签名，未公证。既有模型、数据格式、模式键位、原文和安全交付边界保留。
+**已接入正式应用**：连续原生浮层、真实近期音量与静音反馈、存储恢复、截图缺失状态、模型加载失败复试、配置测试引导、键盘快捷键录入及版本显示。正式包是 [Tess.app](../../dist/0.2.0-build14/Tess.app)，ZIP（历史产物 `dist/Tess-0.1.0.zip`，当前未保留）；版本 0.1.0 / build 9，本机临时签名，未公证。既有模型、数据格式、模式键位、原文和安全交付边界保留。
 
 本轮选择沿用当前深色、蓝色和像素头像；没有新增品牌或皮肤的重大取舍。样板先单独运行、录制并展示，再把同一视图接入会话。目标是轻快且可判断状态，不引入上游整套外观业务。
 
@@ -75,10 +75,10 @@ T01/T02/T05/T06/T07/T08/T10/T11/T12 已实施并完成对应的本地定向检�
 |---|---|---|
 | 源码确认 | 会话开始固定模式/目标；取消与迟到保护；原文与候选保留；目标/光标复核；剪贴板变更保护；隐私边界。最终并行只读复查未发现确定新阻断 | 真键盘事件、真人录音、真实目标已全通过 |
 | Release/定向检查 | `scripts/build.sh`、本机签名完整性；`check-input.sh`、`check-storage.sh`、`check-audio-level.sh`、`check-asr-recovery.sh`；TextCheck 原文/地址/数字否定等检查通过 | 签名公证、App Store发布或完整质量验收 |
-| 隔离原生动效 | [完整流程](evidence/20261011-01/after/hud-full-flow.mp4)、[失败/取消/快速重入](evidence/20261011-01/after/hud-recovery.mp4)、[减少动态效果](evidence/20261011-01/after/hud-reduced-motion.mp4) | 真实麦克风、API、系统全屏或GPU性能通过 |
-| 实际 App 画面 | [同文字结果页](evidence/20261011-01/after/result-window.png)、[通用设置](evidence/20261011-01/after/general-window.png)、[最终配置表单](evidence/20261011-01/after/api-window-final.png)、[正式目标选择浮层](evidence/20261011-01/after/live-target-hud.png) | 所有异常分支和不同显示环境已看过 |
-| 实际隔离恢复 | [损坏配置/缺图](evidence/20261011-01/after/recovery-window.png)、[重试保存后](evidence/20261011-01/after/recovery-after-save.png)；原损坏内容逐字节保留在隔离 Recovery；移除缺失图片后文字保留 | 已自动修复或恢复损坏文件中的内容 |
-| 实际本地推理 | Qwen0.6B处理 macOS TTS 合成的中英/混说/数字/否定/修正/65秒长句；[完整基线与样本](evidence/20261011-01/quality/20261011-01-synthetic-asr-baseline.md) | 真人、口音、噪音、5分钟录音、云端整理或模型优胜 |
+| 隔离原生动效 | [完整流程](../../evidence/20261011-01/after/hud-full-flow.mp4)、[失败/取消/快速重入](../../evidence/20261011-01/after/hud-recovery.mp4)、[减少动态效果](../../evidence/20261011-01/after/hud-reduced-motion.mp4) | 真实麦克风、API、系统全屏或GPU性能通过 |
+| 实际 App 画面 | [同文字结果页](../../evidence/20261011-01/after/result-window.png)、[通用设置](../../evidence/20261011-01/after/general-window.png)、[最终配置表单](../../evidence/20261011-01/after/api-window-final.png)、[正式目标选择浮层](../../evidence/20261011-01/after/live-target-hud.png) | 所有异常分支和不同显示环境已看过 |
+| 实际隔离恢复 | [损坏配置/缺图](../../evidence/20261011-01/after/recovery-window.png)、[重试保存后](../../evidence/20261011-01/after/recovery-after-save.png)；原损坏内容逐字节保留在隔离 Recovery；移除缺失图片后文字保留 | 已自动修复或恢复损坏文件中的内容 |
+| 实际本地推理 | Qwen0.6B处理 macOS TTS 合成的中英/混说/数字/否定/修正/65秒长句；[完整基线与样本](../../evidence/20261011-01/quality/20261011-01-synthetic-asr-baseline.md) | 真人、口音、噪音、5分钟录音、云端整理或模型优胜 |
 
 录像仅采集本任务原生样板窗口，按时间戳生成MP4；原始帧和时间戳位于同目录的 `hud-frames`、`hud-recovery-frames`、`hud-reduced-frames`。画面复看包含录制序列抽帧，不代表人眼实时流畅度验收。前后结果、设置和表单使用相同隔离内容与窗口尺寸；独立样板没有旧版同等录像，不作动效速度的前后提升声明。
 
@@ -88,7 +88,7 @@ ASR测量环境：Apple M3 Pro、36 GB、Mac15,7、macOS27.0.1，电池供电/�
 
 ## 可直接验收的路径
 
-先退出旧版，再打开 [build 9](dist/Tess.app)。保留原有数据与模型。单独看动效可双击 [原生样板启动器](scripts/preview-hud.command)，无需授权或配置。
+先退出旧版，再打开 [build 9](../../dist/0.2.0-build14/Tess.app)。保留原有数据与模型。单独看动效可双击 [原生样板启动器](../../scripts/preview-hud.command)，无需授权或配置。
 
 | 问题 → 产品位置 | 怎么操作 | 预期结果 / 当前边界 |
 |---|---|---|
@@ -104,7 +104,7 @@ ASR测量环境：Apple M3 Pro、36 GB、Mac15,7、macOS27.0.1，电池供电/�
 
 ## 工程交付
 
-无 Git 仓库；保留既有工作，不初始化或推送。修改前快照在文首；[源码差异](evidence/20261011-01/source-changes.diff)基于该快照，仅记录本轮可比文件及新增实现/检查，未将构建缓存当源码。原有文件保留日期编号。界面样板不构造 AppModel、不采音、不调用服务；smoke 必须显式指定隔离数据目录，防止测试状态写进正常历史。ASR基线仅在显式传入模型、语料和输出路径时运行，不随启动执行。
+无 Git 仓库；保留既有工作，不初始化或推送。修改前快照在文首；[源码差异](../../evidence/20261011-01/source-changes.diff)基于该快照，仅记录本轮可比文件及新增实现/检查，未将构建缓存当源码。原有文件保留日期编号。界面样板不构造 AppModel、不采音、不调用服务；smoke 必须显式指定隔离数据目录，防止测试状态写进正常历史。ASR基线仅在显式传入模型、语料和输出路径时运行，不随启动执行。
 
 
 ## 用户复试后的构建 10 修正
@@ -117,7 +117,7 @@ ASR测量环境：Apple M3 Pro、36 GB、Mac15,7、macOS27.0.1，电池供电/�
 | T14 缺陷 P1 | 截图权限拒绝被路由到最近结果，误显示旧识别内容；错误重试身份不明确 | 失败浮层只显示截图说明，重试截图/打开设置/关闭；约8秒自行收起。取消静默，旧数据保留，成功PNG才开预览 | 截图→缺权限→专用提示；允许后重试；Esc取消不显示旧结果 |
 | T15 缺陷 P1 | 旧截图草稿自动附着到普通录音；截图说明失败重试可能丢失图片身份 | 图片关联仅由“添加语音说明”明确指定，并随本次重试保留 | 旧截图存在→普通Fn仍是听写；图片卡→添加说明→重试仍含原图 |
 
-[修改前 build 9 源码](evidence/20261011-02/source-build9.tar.gz)已保存。[截图权限提示的隔离原生视图](evidence/20261011-02/capture-permission.png)使用显式 smoke 分支，不读取系统权限或捕获用户屏幕。真实系统权限不能由测试替身证明；本轮没有替用户开启或重置权限。
+[修改前 build 9 源码](../../evidence/20261011-02/source-build9.tar.gz)已保存。[截图权限提示的隔离原生视图](../../evidence/20261011-02/capture-permission.png)使用显式 smoke 分支，不读取系统权限或捕获用户屏幕。真实系统权限不能由测试替身证明；本轮没有替用户开启或重置权限。
 
 授权后有时需要重开应用，依据 [Apple 官方示例](https://developer.apple.com/documentation/screencapturekit/capturing-screen-content-in-macos)。保留已有系统选区工具，不把子进程当作权限旁路。当前 `exit 1 + 无文件 + 正常退出` 的取消分类并非CLI公开保证，真实选区Esc仍需复试；不能把所有非零退出静默当取消。
 
@@ -126,7 +126,7 @@ ASR测量环境：Apple M3 Pro、36 GB、Mac15,7、macOS27.0.1，电池供电/�
 
 只读取了正常偏好中的相关开关：`alwaysPreview=false`、`shortcutVersion=2`，确认本次常驻不是用户开启预览造成；未读取用户最近结果、截图、音频或密钥。真实权限仍需用户允许：点截图提示的“打开设置”→允许当前 Tess→返回后重试；若已开启仍被拒绝，退出重开 Tess。再次截图时拖选区域，Esc应安静结束，成功才显示新图。
 
-[本次源代码差异](evidence/20261011-02/source-changes.diff) · [构建与验证摘要](evidence/20261011-02/verification.txt)。当前交付为 **0.1.0 / build 10**，覆盖以上用户复试修正；此前 build 9 的证据和未验收范围仍保留。
+[本次源代码差异](../../evidence/20261011-02/source-changes.diff) · [构建与验证摘要](../../evidence/20261011-02/verification.txt)。当前交付为 **0.1.0 / build 10**，覆盖以上用户复试修正；此前 build 9 的证据和未验收范围仍保留。
 
 ## 角色表情动作：构建 11
 
@@ -134,10 +134,10 @@ ASR测量环境：Apple M3 Pro、36 GB、Mac15,7、macOS27.0.1，电池供电/�
 
 开始录音约0.4秒后侧看0.4秒，回原表情；约第3秒眨眼120ms，之后不循环。完成/复制只眨眼一次。所有动作独立于业务时序；隐藏、失败、取消、减少动态效果立即回原图并取消旧任务，重新显示不补播旧动作。参数为本轮原生样板候选，不把表情当作业务成功依据。
 
-使用内置 imagegen 编辑[闭眼帧](assets/branding/tess-avatar-blink-v1.png)和[侧头帧](assets/branding/tess-avatar-turn-v1.png)，原图未覆盖；[原始提示词](evidence/20261011-03/20261011-01-icon-prompts.txt)。半转头候选未形成有效过渡，未进入应用资源。
+使用内置 imagegen 编辑[闭眼帧](../../assets/branding/tess-avatar-blink-v1.png)和[侧头帧](../../assets/branding/tess-avatar-turn-v1.png)，原图未覆盖；[原始提示词](../../evidence/20261011-03/20261011-01-icon-prompts.txt)。半转头候选未形成有效过渡，未进入应用资源。
 
-已通过 Release、本机签名完整性、隔离菜单按钮的 hitTest/非焦点断言和[自身按钮渲染](evidence/20261011-03/menu-bar.png)。[完整原生录像](evidence/20261011-03/icon-motion.mp4)包含34pt头像与18pt菜单栏尺寸；[局部放大](evidence/20261011-03/avatar-closeup.mp4)来自同一原生录像裁切。另有[取消/快速重入/失败](evidence/20261011-03/reentry.mp4)、[减少动态效果](evidence/20261011-03/reduced-motion.mp4)；后者连续96帧的头像区域逐像素一致。原始帧及时间戳在对应目录，均只采集隔离样板窗口。早期录制被系统缩为后台窗口缩略图，最终证据重录为一致1400×1140像素，不混用尺寸。
+已通过 Release、本机签名完整性、隔离菜单按钮的 hitTest/非焦点断言和[自身按钮渲染](../../evidence/20261011-03/menu-bar.png)。[完整原生录像](../../evidence/20261011-03/icon-motion.mp4)包含34pt头像与18pt菜单栏尺寸；[局部放大](../../evidence/20261011-03/avatar-closeup.mp4)来自同一原生录像裁切。另有[取消/快速重入/失败](../../evidence/20261011-03/reentry.mp4)、[减少动态效果](../../evidence/20261011-03/reduced-motion.mp4)；后者连续96帧的头像区域逐像素一致。原始帧及时间戳在对应目录，均只采集隔离样板窗口。早期录制被系统缩为后台窗口缩略图，最终证据重录为一致1400×1140像素，不混用尺寸。
 
-**验收：T16 → 设置→通用与快捷键→输入浮层预览 → 播放全流程**，观察侧看、眨眼和回正；点取消、快速再次唤起，再勾选减少动态效果。独立入口为[原生样板启动器](scripts/preview-hud.command)。这是隔离测试信号；没有真人麦克风/API验收，也未宣称真实菜单栏自动隐藏、全屏/多屏和VoiceOver均通过。运行检查时已有正常Tess实例，最终用独立标识的预览副本避免操作正常结果。
+**验收：T16 → 设置→通用与快捷键→输入浮层预览 → 播放全流程**，观察侧看、眨眼和回正；点取消、快速再次唤起，再勾选减少动态效果。独立入口为[原生样板启动器](../../scripts/preview-hud.command)。这是隔离测试信号；没有真人麦克风/API验收，也未宣称真实菜单栏自动隐藏、全屏/多屏和VoiceOver均通过。运行检查时已有正常Tess实例，最终用独立标识的预览副本避免操作正常结果。
 
-当前交付更新为 **0.1.0 / build 11**：[应用](dist/Tess.app)、[压缩包](dist/Tess-0.1.0.zip)。[源码差异](evidence/20261011-03/source-changes.diff)基于保存的build10快照；[验证摘要](evidence/20261011-03/verification.txt)。退出旧版后打开新包；构建10的窗口与截图修正继续保留。
+当前交付更新为 **0.1.0 / build 11**：[应用](../../dist/0.2.0-build14/Tess.app)、压缩包（历史产物 `dist/Tess-0.1.0.zip`，当前未保留）。[源码差异](../../evidence/20261011-03/source-changes.diff)基于保存的build10快照；[验证摘要](../../evidence/20261011-03/verification.txt)。退出旧版后打开新包；构建10的窗口与截图修正继续保留。

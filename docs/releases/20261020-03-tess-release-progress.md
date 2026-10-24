@@ -1,6 +1,6 @@
 # Tess 正式安装包实施进度
 
-2026-10-24：本机已更新 **build 20** 绿色精灵 + Humanist 视觉版，构建、隔离交互回归、签名及主要窗口检查通过，设置和离线模型保留。build 17 真人使用验收仍为既有证据，本轮未重复真人录音。正式公证和 DMG 继续暂缓，dist 仍是旧 build 14。以 [品牌更新记录](20261024-01-tess-brand-refresh.md) 为当前状态，下文为历史进展。 build 19 已移除正常界面中的 Talkify 标注，原版权与许可文本仍随包保留。 build 20 为状态栏精灵增加细深绿描边。
+2026-10-24：本机已更新 **build 20** 绿色精灵 + Humanist 视觉版，构建、隔离交互回归、签名及主要窗口检查通过，设置和离线模型保留。build 17 真人使用验收仍为既有证据，本轮未重复真人录音。正式公证和 DMG 继续暂缓，dist 仍是旧 build 14。以 [品牌更新记录](../history/20261024-01-tess-brand-refresh.md) 为当前状态，下文为历史进展。 build 19 已移除正常界面中的 Talkify 标注，原版权与许可文本仍随包保留。 build 20 为状态栏精灵增加细深绿描边。
 
 ## 已完成
 
@@ -106,7 +106,7 @@
 - 真人 TextEdit 验收：物理 Fn 轻点开始/结束、长按/释放均自动输入成功，样句包含“今天我们测试自动输入”和“明天 review the plan”。用户确认“两次都自动输入，内容基本正确”；不将此表述扩大成精确识别率结论。没有替用户点击“已确认输入成功”。见 `physical-fn-textedit.json`。
 - Chrome 155.0.8059.85：普通 textarea 已通过；contenteditable 首次未插入，固定句投递检查后，在测试页保持前台的条件下，用户物理 Fn 重测确认“自动追加成功”。没有为此放宽生产可编辑性判断。见 `browser-and-chat-status.json`。
 - 微信 4.1.15 (270115)：用户实测未插入。后续应用级及系统级 AXFocusedUIElement 均返回 `-25212 / noValue`；EnhancedUI=true，ManualAccessibility 不支持。窗口或按钮不代表可编辑输入框，当前没有把它们作为自动投递许可。最终元数据见 `input-metadata-1792767351.040179.json`，它补充浏览器/聊天汇总中尚待检查的 system focus 项。
-- 用户明确要求微信必须自动输入后才交付。公证、DMG 与最终交付暂缓，继续解决微信；没有提交 App Store 或公开发布。InputMethodKit/palette 研究见 [微信输入法接口研究](evidence/20261023-build15/wechat-input-method-research.md)：可能需要新增系统输入法组件，尚未实现或启用，不构成微信通过证据。
+- 用户明确要求微信必须自动输入后才交付。公证、DMG 与最终交付暂缓，继续解决微信；没有提交 App Store 或公开发布。InputMethodKit/palette 研究见 [微信输入法接口研究](../../evidence/20261023-build15/wechat-input-method-research.md)：可能需要新增系统输入法组件，尚未实现或启用，不构成微信通过证据。
 - Fn 休眠状态修复已通过隔离复现及回归：休眠/会话失活时清理 Fn 持键状态，恢复时刷新监听，并保留快捷键录入的暂停状态。该结果没有让 Mac 实际休眠，也不能替代物理唤醒后的第一次 Fn 检查。见 `review-and-regression.md`。
 - 真实取消后重开、目标切换、休眠唤醒仍待验收。用户权限、模型和引导进度没有重置；新正式包的覆盖更新与配置权限保留仍需重新检查。
 
@@ -119,7 +119,7 @@
 | `dist/Tess.app`、`dist/Tess-0.2.0-arm64.dmg` | 仍是有已知输入故障的已公证 build 14；不是本轮最终交付 |
 | `.build/notarized-offline/Tess.app`、`.build/notarized/Tess.app` | 分别是旧 build 14、旧 build 13，禁止误用为 build 15 |
 
-本轮证据位于 [evidence/20261023-build15](evidence/20261023-build15)。继续时先解决微信并完成剩余真人验收，再以明确的新归档/导出目录完成 Apple 公证、签名票据/Gatekeeper、DMG、下载隔离及覆盖更新检查，更新新包摘要。沿用已授权的完整应用与公开模型 Apple 公证上传，无需重新索要凭据。
+本轮证据位于 [evidence/20261023-build15](../../evidence/20261023-build15)。继续时先解决微信并完成剩余真人验收，再以明确的新归档/导出目录完成 Apple 公证、签名票据/Gatekeeper、DMG、下载隔离及覆盖更新检查，更新新包摘要。沿用已授权的完整应用与公开模型 Apple 公证上传，无需重新索要凭据。
 
 
 ## 2026-10-23 微信兼容与 Globe 轻点问题：build 17 修复中
@@ -190,4 +190,4 @@ Release、隔离 InteractionCheck 和 CaptureCheck 通过；Developer ID 签名�
 
 `dist` 仍为旧 build 14，本轮未开展正式归档、公证或 DMG。相关本机变更见 README 与 `evidence/20261024-screenshot-in-place/`、`evidence/20261024-screenshot-default-box/`。
 
-用户已确认后续统一按 [迭代与发布流程](docs/iteration-and-release.md) 执行；项目结构见 [架构与目录地图](docs/project-map.md)。本轮仅落地流程、导航和结构说明，没有搬迁文件、清理旧包或开始正式发布。
+用户已确认后续统一按 [迭代与发布流程](../iteration-and-release.md) 执行；项目结构见 [架构与目录地图](../project-map.md)。本轮仅落地流程、导航和结构说明，没有搬迁文件、清理旧包或开始正式发布。

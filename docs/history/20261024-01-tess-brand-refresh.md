@@ -31,7 +31,7 @@
 - 安装后的关于、通用设置、权限页已通过 CUA 查看；显示 0.2.0 (18)，配色、头像和字标正常。
 - 打包模型逐文件匹配固定版本 receipt 摘要。签名与安装核对见 `signature.log`、`installed-signature.log`、`install-verification.json`。
 
-画板：[品牌与 HUD](evidence/20261024-brand-refresh/BrandHUD.png)、[18pt 菜单栏](evidence/20261024-brand-refresh/MenuBar18pt.png)。源码／资源备份见同目录 `before/`。
+画板：[品牌与 HUD](../../evidence/20261024-brand-refresh/BrandHUD.png)、[18pt 菜单栏](../../evidence/20261024-brand-refresh/MenuBar18pt.png)。源码／资源备份见同目录 `before/`。
 
 build 17 的真人输入验收仍为既有证据，build 18 本轮未重复真人录音。正式公证、新 DMG 与分发验收继续暂缓；本轮没有提交 Apple 公证、制作新 DMG 或公开发布，`dist` 保持旧 build 14。
 
