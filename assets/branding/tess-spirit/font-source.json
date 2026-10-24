@@ -1,0 +1,12 @@
+{
+  "family": "Source Sans 3",
+  "style": "Semibold",
+  "version": "3.052",
+  "release": "https://github.com/adobe-fonts/source-sans/releases/tag/3.052R",
+  "download": "https://github.com/adobe-fonts/source-sans/releases/download/3.052R/OTF-source-sans-3.052R.zip",
+  "license": "https://github.com/adobe-fonts/source-sans/blob/3.052R/LICENSE.md",
+  "archive_sha256": "a4ebbdea20b08ccbd7bf3665a9462454eefdd01d9a6307129d3b3d4672981074",
+  "font_sha256": "36f1cd2c344aa3109e64429bce41a41e4b2b923beb2db19b8dbf9bb56f05a4f9",
+  "font_file": "Tess/Resources/SourceSans3-Semibold.otf",
+  "license_file": "Tess/Resources/SourceSans3-OFL.txt"
+}

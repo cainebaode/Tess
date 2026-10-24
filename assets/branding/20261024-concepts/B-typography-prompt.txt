@@ -1,0 +1,19 @@
+Tess B typography study — 2026-10-24
+Tool: built-in image_gen (imagegen skill)
+Input: B-soft-spirit.png, mascot and palette reference.
+Output: B-typography-options.png
+Concept lettering only; no production font family selected.
+
+Use case: logo-design / brand typography refinement. Use the attached existing B brand board as the visual identity reference. The user LOVES the soft green quotation-bean spirit mascot, but dislikes the heavy bubbly wordmark. Create ONE new landscape 3:2 typographic comparison board with THREE clearly different refined typography options, retaining the EXACT original mascot design and pale cream / pine green / spring green palette.
+
+NONNEGOTIABLE: retain the reference spirit's exact asymmetric bean / quotation shape, the small upper curved horn and notch, two dark oval eyes, no mouth, no limbs, no additional features, same proportions and green. Do not redesign the mascot. Retain its recognizable papery matte sculptural surface when showing the 3D hero. All repeated flat icons must have the SAME exact original silhouette.
+
+Composition: sophisticated clean comparison sheet, no busy moodboard. A restrained top header reads 'tess / type studies'; at top right show one modest-size cropped-free original 3D green mascot, exactly matching the reference. Below the header, three EQUAL vertical columns separated only by hairline pine-green rules, ample margins and whitespace. Label them '01 / LIGHT ROUNDED', '02 / HUMANIST', '03 / SOFT SERIF'. This is a TYPOGRAPHY board, so names must be very large and clear, with no overlap or cropping. Use identical deep pine-green ink for all wordmarks, identical approximate lowercase x-height for fair comparison.
+
+Column 01: exact text 'tess', all lowercase, beautiful LIGHT-to-REGULAR rounded geometric sans serif. Slender but readable monoline strokes, lightly rounded terminals, generous open counters, ample air inside e, refined soft curves, slightly wide tracking. NOT bold, NOT balloon, NOT children lettering. Warm and airy. Avoid resembling the original thick inflated typography.
+Column 02: exact text 'tess', all lowercase, sophisticated HUMANIST SANS in medium weight. Carefully drawn natural open e, elegant narrow t with subtly curved foot, balanced double s with lightly angled humanist terminals, subtle stroke variation, compact but breathable optical kerning. Crisp and mature yet warm, excellent independent Mac software brand craft. NO serif, no pill-rounded terminals, no inflated strokes. This should be the most balanced polished option.
+Column 03: exact text 'tess', all lowercase, a graceful SOFT CONTEMPORARY SERIF in regular weight. Low-to-moderate stroke contrast, small gently bracketed / flared serifs, broad open e, flowing s curves. Quiet literary warmth and editorial elegance, clearly differentiated from both sans alternatives. No hairline fashion serif, no italic, no script, no slab serif, no ornate flourishes.
+
+Below each giant wordmark include one smaller horizontal real-world lockup: the EXACT same small flat green reference mascot followed by that column's wordmark. Below the lockup include that column's wordmark in ivory on an identical dark-green rectangular swatch. Each column gets one modest cream rounded settings-header sample containing the same flat green mascot and its wordmark at a plausible readable small size; NO fake functional controls. The spirit stays visually identical in all three columns: only the lettering changes.
+
+Only text allowed: 'tess / type studies', the three numbered labels, and the word 'tess' in the specified places. No font family claims, no additional slogan, no 'recommended' tag. Beautiful professional identity studio typography study, calm polished layout, crisp letter shapes, no extra decorative elements. Prioritize genuinely different typographic structures, precise kerning, and exact mascot preservation. This is a concept comparison, not a final installed typeface.

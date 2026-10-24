@@ -1,0 +1,22 @@
+Tess 0.1.0
+
+Talkify — MIT
+https://github.com/tornikegomareli/Talkify
+Commit: a880149d55f3b32d7a0784fb019d49be0ae19eb9
+SettingsTheme, SettingsCard, SettingsRow, SettingsButtonStyle are copied unchanged.
+Tess uses a native AppKit shell and a compact black voice panel following Talkify.
+No Talkify unlicensed Siri artwork or noncommercial sounds are included.
+
+Speech Swift — Apache-2.0
+https://github.com/soniqo/speech-swift
+Commit: cbcdfc6be5e723952d29ab6e32af5e22ad8e70fa
+Selected source modules are vendored with their original license.
+WhisperCoreMLRuntime.swift adds cancellation checks and a decoder-capacity error.
+Unused speech servers and synthesis modules are excluded from the package.
+
+Qwen3-ASR models — Apache-2.0
+https://github.com/QwenLM/Qwen3-ASR
+Whisper models — MIT
+https://github.com/openai/whisper
+Models are downloaded only after a user action; weights are not in the application.
+Model revisions are recorded in each model's integrity receipt after download.

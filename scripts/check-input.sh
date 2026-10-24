@@ -1,0 +1,19 @@
+#!/bin/zsh
+set -euo pipefail
+task_root="${0:A:h:h}"
+cd "$task_root"
+mkdir -p .build/checks
+# Compile the actual model identifier enum without loading the ASR dependencies.
+python3 - <<'PY'
+from pathlib import Path
+source = Path("Tess/Sources/ASRService.swift").read_text()
+model_enum = source[source.index("enum ASRModel:"):source.index("\nenum ASRModelState:")]
+Path(".build/checks/ASRModel.swift").write_text("import Foundation\n" + model_enum)
+PY
+xcrun swiftc -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
+  -module-cache-path .build/checks/ModuleCache \
+  .build/checks/ASRModel.swift Tess/Sources/Localization.swift \
+  Tess/Sources/HotkeyService.swift Tess/Sources/DeliveryService.swift \
+  Tess/Sources/TextService.swift Tess/Sources/APIConfiguration.swift Tess/Sources/LocalStore.swift \
+  Tess/Checks/InputCheck.swift -o .build/checks/input-check
+.build/checks/input-check

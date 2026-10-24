@@ -1,0 +1,7 @@
+Tess production mascot — 2026-10-24
+Tool: built-in image_gen (imagegen skill)
+Input: ../20261024-concepts/B-soft-spirit.png
+Output: tess-mascot.png
+transparent_background: true
+
+Use case: precise-object-edit / production asset extraction. The attached Tess brand board is the APPROVED identity. Extract only the LARGE GREEN 3D SPIRIT MASCOT at the upper right of the reference. Output ONE isolated high resolution PNG with a genuinely transparent background and no other elements. Preserve the exact approved character: asymmetrical soft bean/quotation shape, wide rounded lower body, a single gently rounded upper hook at the upper left that curls rightward, concave notch at upper right, two dark pine-green oval eyes, no mouth, no limbs. Preserve its face proportions, its forward view with slight natural diagonal eye positions, original spring green hue, matte subtle tactile paper texture, soft upper-left light and gentle shading. Do NOT redesign, do NOT add ears/hair/headphones/accessories. The shape should match the large hero in the reference, not invent a new animal. Remove ALL text, icons, tiles, layout, cream background, ground plane and drop shadow. The body must be fully opaque inside, outside must be transparent, no cream halo. Entire character centered with about 10% transparent margin on all sides, square canvas 1024x1024. Keep the character visually substantial and clean at 150pt as a Mac welcome illustration. No wordmark in this asset.

@@ -1,0 +1,13 @@
+Source: https://github.com/soniqo/speech-swift
+Revision: cbcdfc6be5e723952d29ab6e32af5e22ad8e70fa
+License: Apache-2.0, included as LICENSE.
+
+This local package contains AudioCommon, MLXCommon, Qwen3ASR,
+and WhisperASR source directories from the revision above. Tess adds cooperative
+cancellation and a decoder-capacity error in WhisperCoreMLRuntime.swift.
+Other source files are unchanged. Its smaller package
+manifest omits unrelated products and dependencies. StreamingASR.swift is not
+compiled because Tess uses complete PCM sessions and its own recorder, without
+the SpeechVAD streaming pipeline.
+
+Runtime model files are downloaded only when requested in Tess Settings.

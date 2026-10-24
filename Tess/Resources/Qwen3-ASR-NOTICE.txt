@@ -1,0 +1,6 @@
+Tess includes Qwen3-ASR 0.6B, an MLX 4-bit conversion by aufklarer of Qwen/Qwen3-ASR-0.6B.
+Qwen3-ASR is provided by the Qwen team, Alibaba Cloud.
+Conversion: https://huggingface.co/aufklarer/Qwen3-ASR-0.6B-MLX-4bit
+Original model: https://huggingface.co/Qwen/Qwen3-ASR-0.6B
+Model license: Apache License 2.0 (see Qwen3-ASR-LICENSE.txt).
+No additional changes to the converted weights are made by Tess.
