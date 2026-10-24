@@ -22,7 +22,7 @@ print('Base speech model hashes verified:',receipt['revision'])
 PY
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Tess/Info.plist)
 build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Tess/Info.plist)
-release_root="$task_root/.build/releases/${version}-build${build}"
+release_root="${TESS_RELEASE_ROOT:-$task_root/.build/releases/${version}-build${build}}"
 archive_path="$release_root/archive/Tess.xcarchive"
 [[ ! -e "$archive_path" ]] || { print -u2 "Archive already exists; preserve it before rebuilding: $archive_path"; exit 1; }
 mkdir -p "$release_root/archive" .build/cache

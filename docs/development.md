@@ -1,0 +1,72 @@
+# Tess 苔丝
+
+原生 macOS 菜单栏语音输入与原位截图标注工具，面向 Apple Silicon、macOS 26+。项目目录沿用早期名称 Faster，产品名称为 Tess。
+
+源码与发行仓库：[cainebaode/Tess](https://github.com/cainebaode/Tess)，公开仓库。旧 Faster 作为只读历史归档。日常迭代和正式交付按 [迭代与发布流程](iteration-and-release.md) 执行。
+
+## 当前状态
+
+2026-10-25：[Tess 产品站](https://tess.baode.life/) 已上线，[公开下载仓库](https://github.com/cainebaode/Tess) 已完成 build 25 公开下载发布；文件大小与完整 SHA-256、公开下载及校验文件均已核对。接入与下载状态见 [网站与下载发布记录](releases/20261025-01-tess-website-and-download.md)。
+
+2026-10-24：**Tess 0.2.0 build 25 正式离线安装包已完成，并已从实际下载的最终 DMG 经 Finder 覆盖安装至 `/Applications/Tess.app`、启动。**
+
+- [最终 DMG](../dist/0.2.0-build25/20261024/Tess-0.2.0-build25-arm64.dmg)：616,302,726 字节，约 616.3 MB；[SHA-256](../dist/0.2.0-build25/20261024/Tess-0.2.0-build25-arm64.dmg.sha256)、[随包记录](../dist/0.2.0-build25/20261024/交付记录.md)。
+- App 与 DMG 独立签名、公证票据、Gatekeeper 均通过；App Hardened Runtime、Apple 时间戳、完整离线模型及许可核对通过。
+- 实际浏览器下载保留隔离标记；Finder 替换后代码与归档一致，偏好值、文字服务配置、用户模型和引导保留，未重置权限或 Keychain。
+- build 25 候选集中人工清单已获用户“全部完成，推进发布”反馈。**最终安装版使用验收由用户自行进行，尚未收到通过反馈。**
+- 绿色精灵、Humanist 字标、菜单栏与原位截图功能保留；本轮未修改应用实现。旧 `dist/0.2.0-build14/` 有已知输入故障，仅保留为历史。
+- 10 月 24 日交付轮次未公开发布或提交 App Store；临时服务器、挂载和桌面操作助手已清理。10 月 25 日网站与公开下载另行推进。该次交付详见 [build 25 正式交付](releases/20261024-02-tess-build25-offline-delivery.md)。
+
+## 工作入口
+
+| 内容 | 文档 |
+| --- | --- |
+| 后续迭代和正式交付 | [迭代与发布流程](iteration-and-release.md) |
+| 代码、依赖和目录关系 | [项目架构](project-map.md) |
+| 本轮整理范围与保留清单 | [整理记录](workspace-organization.md) |
+| 所有旧路径的新位置 | [路径映射](workspace-layout.json) |
+| 产品需求 | [PRD](product/20261007-02-tess-prd.md)、[BRD](product/20261007-01-faster-brd.md) |
+| 正式交付状态 | [发布进度](releases/20261020-03-tess-release-progress.md)、[安装验收](releases/20261020-04-tess-installer-acceptance.md) |
+| 早期版本记录 | [历史 README](history/readme-through-build25.md) |
+| 本机原始验收材料 | [证据目录说明](../evidence/README.md)，原始内容不上传 GitHub |
+
+## 目录
+
+```text
+Tess/          当前应用工程、源码、资源、独立检查和实际编译的 Vendor 代码
+scripts/       开发构建、检查、正式归档和打包；release/ 保存公开发行配置
+assets/        品牌源素材
+docs/         产品需求、固定流程、发布记录、历史记录和架构说明
+evidence/     本机原始证据；Git 仅包含目录说明
+.build/        本机产物，按 cache/local/releases/models/verification/history/tools/logs 分开
+dist/         按版本和 build 存放交付物，不进入源码 Git；正式包独立经 Releases 分发
+upstream/     上游参考副本，不上传 GitHub
+```
+
+## 开发构建
+
+需要 Xcode 26+ 及对应 Metal 编译组件。在项目根目录运行：
+
+```sh
+./scripts/build.sh
+```
+
+开发输出为 `.build/local/<version>-build<build>/development/Tess.app` 和同目录 ZIP，日志在同目录 `build.log`；缓存统一在 `.build/cache/`。该命令不写 `dist`，不自动安装，不嵌入正式离线模型；默认临时签名。
+
+本机已保留的完整候选位于版本目录直接下的 `Tess.app`，与 `development/Tess.app` 分开。覆盖更新须单独退出旧版，使用原签名身份和完整资源安装，保留配置、权限、模型与引导进度。需要实际操作验收时由用户完成。
+
+## 正式交付
+
+1. 冻结源码并记录 Git 提交和版本／build；必要人工验收结果分别记录。
+2. 用 `scripts/archive-release.sh` 生成 `.build/releases/<version>-build<build>/archive/Tess.xcarchive`，基础模型源在 `.build/models/qwenSmall/`。
+3. 沿用现有 Xcode 登录，以 `scripts/release/ExportOptions.plist` 完成 Apple 公证，将最终导出 App 放入同版本的 `notarized/Tess.app`。
+4. 检查模型、签名、票据和 Gatekeeper，再运行 `scripts/package-dmg.sh`，输出到 `dist/<version>-build<build>/`。
+5. 从最终 DMG 实际安装并完成用户复核，记录大小、SHA-256 和交付结论。
+
+独立模型权重不进入源码仓库；正式离线 DMG 内含随包基础模型，经同一 Tess 仓库的 Releases分发。公开固定版本的校验收据与准备说明见 [发行配置](../scripts/release/README.md)。不使用旧包的公证结果代替新版本检查，也不将本机候选当作正式交付物。
+
+## 数据与依赖
+
+正常用户数据位于 `~/Library/Application Support/Tess/`，API Key 在 macOS Keychain；基础识别在本机运行，文字 API 为可选服务，截图不发送给文字模型。Tess 不自动发送消息。
+
+Swift 依赖解析记录、实际 Vendor 源码、品牌素材与许可均纳入 Git；缓存、模型权重、App／DMG、原始证据和本机配置不纳入 Git。第三方许可位于 `Tess/Resources/` 和 `Tess/Vendor/SpeechSwift/`。

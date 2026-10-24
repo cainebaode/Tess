@@ -1,6 +1,6 @@
 # Tess 项目架构与目录地图
 
-核对日期：2026-10-24。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮保留根目录名称，已按功能迁移文档与本机产物，GitHub 仓库名沿用 Faster。
+核对日期：2026-10-24。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮保留根目录名称，已按功能迁移文档与本机产物，GitHub 仓库于 2026-10-25 统一为公开的 `cainebaode/Tess`，源码与 Releases 一起维护。
 
 ## 当前项目是什么
 
@@ -28,7 +28,7 @@ flowchart TD
 | `evidence/` | 按轮次保存的日志、截图、人工反馈、源码及配置快照 | 查证具体构建时使用，不属于应用源码 |
 | `upstream/` | Talkify 与 speech-swift 的上游参考副本，保留在本机 | 研究来源时使用，不参与 GitHub 同步 |
 | `.build/` | 按 cache/local/releases/models/verification/history/tools/logs 分组 | 各类独立存放，见下方清单 |
-| `dist/` | 按版本／build 分组的交付输出；当前仅有旧 build 14 | 不上传 GitHub，不代表最新安装版 |
+| `dist/` | 按版本／build 分组的交付输出；当前包含 build 25 本轮包与 build 14 历史包 | 不进入源码 Git；公开正式包经 Tess 的 Releases 分发，不代表最新安装版 |
 | `docs/product/` | BRD、PRD | 查产品依据 |
 | `docs/releases/` | 安装计划、发布进度与验收 | 记录交付过程 |
 | `docs/history/` | 优化、品牌及旧 README 等历史材料 | 旧状态有时间边界 |
@@ -78,6 +78,7 @@ flowchart TD
 | `.build/local/0.2.0-build25/Tess.app` | 与当前本机版本对应的完整候选 |
 | `.build/local/0.2.0-build24/Tess.app` | 紧邻回退 |
 | `.build/local/0.2.0-build21/Tess.app` | 用户曾确认整体可用的早期截图版 |
+| `.build/releases/0.2.0-build25/20261024/` | 本轮正式离线归档、已公证 App、DMG 公证容器及暂存；上传专用容器不安装或交付 |
 | `.build/releases/0.2.0-build14/` 至 `build17/` | 历史正式归档及相应公证导出，不能概括为都已公证 |
 | `.build/history/` | 其余旧候选、备份、源码快照与旧打包暂存，保留未删 |
 | `.build/cache/` | 当前编译与依赖缓存；迁移前预编译缓存在 `legacy/`，因包含绝对路径而单独留存 |
@@ -85,12 +86,17 @@ flowchart TD
 | `.build/verification/` | 隔离检查、验收和诊断资料 |
 | `.build/tools/release/` | 历史发行工具；当前公证配置已纳入 `scripts/release/` |
 | `.build/logs/` | 历史构建与启动日志 |
-| `dist/0.2.0-build14/` | 旧 App、DMG、摘要，有已知输入故障；本轮未生成新正式包 |
+| `dist/0.2.0-build25/20261024/` | 本轮 616,302,726 字节正式离线 DMG、摘要及安装说明；App／DMG 独立公证与 Gatekeeper 通过，实际隔离下载和 Finder 安装技术复核完成，使用验收由用户自行进行 |
+| `dist/0.2.0-build14/` | 旧 App、DMG、摘要，有已知输入故障；保留为历史 |
 
-项目已建立 Git main 分支和私有 GitHub 远端。整理前源码标签 `local-build25-baseline` 可用于查看当时的代码与目录；Git 不包含本机二进制和原始验收资料。GitHub 同步源码、必要品牌资源、文档、脚本、锁定依赖和公开校验清单。
+项目已建立 Git main 分支和公开 GitHub 远端 `cainebaode/Tess`。整理前源码标签 `local-build25-baseline` 可用于查看当时的代码与目录；Git 不包含本机二进制和原始验收资料。GitHub 同步源码、必要品牌资源、文档、脚本、锁定依赖和公开校验清单。
 
-原始 `evidence/` 可能包含配置快照及桌面材料，因此仅在本机保留。上游参考、缓存、模型和安装包也不上传。整理范围及旧路径定位见 [整理记录](workspace-organization.md) 和 [完整路径映射](workspace-layout.json)。
+原始 `evidence/` 可能包含配置快照及桌面材料，因此仅在本机保留。上游参考、缓存和独立模型权重不上传源码仓库。正式离线安装包经用户明确授权，在同一公开仓库 `cainebaode/Tess` 的 Releases 分发。整理范围及旧路径定位见 [整理记录](workspace-organization.md) 和 [完整路径映射](workspace-layout.json)。
 
 ## 版本核对快照
 
-2026-10-24 核对：源码与本机应用为 `0.2.0 build 25`；`dist/0.2.0-build14/Tess.app` 与同目录旧 DMG 仍对应 build 14。最新原位截图的人工验收尚无确认记录。本文件仅解释结构，后续版本状态以 README 最新核对和对应验收证据为准。
+2026-10-24 核对：源码、正式 App、最终 DMG 及本机安装版均为 `0.2.0 build 25`。`dist/0.2.0-build25/20261024/` 为本轮正式交付目录；最终包实际下载隔离、Finder 替换和安装技术复核完成。候选完整清单已有用户通过反馈；最终安装版使用验收按用户最新要求由其自行进行，尚未收到通过确认。旧 build 14 保留为历史；详细证据与限制见 README 和本轮交付记录。
+
+## 产品网站与公开下载
+
+产品站源码位于 BaodeLife 工程 `website/static-sites/tess/`，入口为 https://tess.baode.life/。本项目保留应用实现、品牌源素材和公开说明维护副本 `scripts/release/public/`；源码、产品介绍和 Release 统一在公开的 Tess 仓库；旧 Faster 只保留为归档。当前状态见 [网站与下载记录](releases/20261025-01-tess-website-and-download.md)。
