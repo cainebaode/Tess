@@ -1,0 +1,20 @@
+name: Transfer verified build 25
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: tess-build25-transfer
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Fetch the signed installer and verify its frozen checksum
+        run: |
+          curl --fail --location --retry 3 --continue-at - --max-time 2700 --output Tess-0.2.0-build25-arm64.dmg https://tess.baode.life/release-upload-source/Tess-0.2.0-build25-arm64.dmg
+          echo '91b3d70c881f52b3abe816e3bfb25eb162a636f2a36007d27e3cd58af4ee8b50  Tess-0.2.0-build25-arm64.dmg' | sha256sum --check
+      - name: Attach the verified installer to the existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v0.2.0-build25 Tess-0.2.0-build25-arm64.dmg --repo cainebaode/tess-releases --clobber
