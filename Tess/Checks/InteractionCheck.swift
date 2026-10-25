@@ -83,6 +83,9 @@ enum ASRError: Error { case silence, isolatedFailure }
     private(set) var pendingDelivery: CheckedContinuation<Void, Never>?
     private(set) var completedDeliveries = 0
     private(set) var delivered: [String] = []
+    init(diagnosticURL: URL? = nil) {}
+    func startDesktopAccessibilityPreparation() {}
+    func failureDescription(chinese: Bool) -> String? { nil }
     func captureTarget(compatibilityShortcut: (keyCode: UInt32, modifiers: UInt32)? = nil) -> Target? {
         onCapture?()
         let target = Target()
@@ -178,6 +181,44 @@ enum ASRError: Error { case silence, isolatedFailure }
 }
 
 @main @MainActor struct InteractionCheck {
+    private static func checkPromptPreferences(root: URL) throws {
+        var previous = AppPreferences()
+        previous.language = .english
+        previous.holdToRecord = false
+        previous.alwaysPreview = true
+        previous.textMode = .polish
+        previous.recognitionLanguage = "en"
+        previous.shortcutVersion = 2
+        previous.completedOnboarding = true
+        previous.onboardingStep = 4
+        previous.onboardingPracticePassed = true
+        previous.asrModel = .qwenSmall
+        previous.microphoneID = 123
+        var legacyJSON = try JSONSerialization.jsonObject(with: JSONEncoder().encode(previous)) as! [String: Any]
+        legacyJSON.removeValue(forKey: "textPrompts")
+        let restored = try JSONDecoder().decode(AppPreferences.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        precondition(restored.textPrompts == nil, "Older preferences must use the default prompts")
+        precondition(restored.language == previous.language && restored.holdToRecord == previous.holdToRecord && restored.alwaysPreview == previous.alwaysPreview)
+        precondition(restored.textMode == previous.textMode && restored.recognitionLanguage == previous.recognitionLanguage && restored.bindings == previous.bindings)
+        precondition(restored.shortcutVersion == previous.shortcutVersion && restored.completedOnboarding == previous.completedOnboarding)
+        precondition(restored.onboardingStep == previous.onboardingStep && restored.onboardingPracticePassed == previous.onboardingPracticePassed)
+        precondition(restored.asrModel == previous.asrModel && restored.microphoneID == previous.microphoneID)
+
+        let scenario = try Scenario(root: root)
+        let prompts = TextPrompts(common: "保留中英混合。", light: "只补标点。", list: "已有项目逐条列出。", polish: "使用我的表达习惯。")
+        precondition(scenario.app.saveTextPrompts(prompts))
+        let preferencesFile = scenario.app.directory.appendingPathComponent("preferences.json")
+        let persisted = try JSONDecoder().decode(AppPreferences.self, from: Data(contentsOf: preferencesFile))
+        precondition(persisted.textPrompts == prompts, "Saving preferences must retain all four prompt fields")
+        let reopened = AppModel()
+        precondition(reopened.preferences.textPrompts == prompts, "App startup must restore custom prompts")
+        precondition(reopened.preferences.completedOnboarding && reopened.preferences.language == .chinese)
+        try FileManager.default.removeItem(at: preferencesFile)
+        try FileManager.default.createDirectory(at: preferencesFile, withIntermediateDirectories: true)
+        precondition(!scenario.app.saveTextPrompts(TextPrompts()), "A failed write must be reported")
+        precondition(scenario.app.preferences.textPrompts == prompts, "A failed save must keep the active prompts")
+    }
+
     static func waitFor(_ description: String, _ condition: () -> Bool) async throws {
         for _ in 0..<200 {
             if condition() { return }
@@ -201,6 +242,7 @@ enum ASRError: Error { case silence, isolatedFailure }
             if let priorDirectory { setenv("TESS_DATA_DIRECTORY", priorDirectory, 1) } else { unsetenv("TESS_DATA_DIRECTORY") }
             try? FileManager.default.removeItem(at: root)
         }
+        try checkPromptPreferences(root: root)
 
         // Local notifications exercise production observer routing without sleeping the Mac.
         let interrupted = try Scenario(root: root)

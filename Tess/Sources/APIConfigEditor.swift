@@ -9,6 +9,8 @@ struct APIConfigEditor: View {
     @State private var error: String?
     @State private var testResult: TextResult?
     @State private var sampleIndex = 0
+    @State private var sampleText = TextService.samples[0]
+    @State private var testMode: TextMode = .light
     @State private var testTask: Task<Void, Never>?
     @State private var testing = false
 
@@ -79,12 +81,22 @@ struct APIConfigEditor: View {
                                 Text("\(app.tr("样例", "Sample")) \(index + 1)").tag(index)
                             }
                         }.padding(.vertical, 8).disabled(testing)
-                        Text(TextService.samples[sampleIndex]).font(.system(size: 13)).textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                        Picker(app.tr("测试模式", "Test mode"), selection: $testMode) {
+                            ForEach([TextMode.light, .list, .polish]) { mode in
+                                Text(app.modeTitle(mode)).tag(mode)
+                            }
+                        }.padding(.vertical, 8).disabled(testing)
+                        Text(app.tr("使用已保存的提示词，可在下方修改测试文字。", "Uses your saved prompts. You can edit the sample text below."))
+                            .font(.caption).foregroundStyle(SettingsTheme.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 8)
+                        TextEditor(text: $sampleText).font(.system(size: 13)).scrollContentBackground(.hidden)
+                            .padding(8).frame(height: 100).disabled(testing)
                             .background(SettingsTheme.sidebar, in: RoundedRectangle(cornerRadius: 8))
+                            .accessibilityLabel(app.tr("测试文字", "Sample text"))
                         HStack {
-                            Button(app.tr("保存并测试轻量整理", "Save & test light editing")) { runTest() }
-                                .disabled(testing).buttonStyle(.borderedProminent).foregroundStyle(.white).controlSize(.regular)
+                            Button(app.tr("保存并测试", "Save & test")) { runTest() }
+                                .disabled(testing || sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                .buttonStyle(.borderedProminent).foregroundStyle(.white).controlSize(.regular)
                             if testing {
                                 ProgressView().controlSize(.small)
                                 Button(app.tr("取消测试", "Cancel test")) { testTask?.cancel() }.buttonStyle(SettingsButtonStyle())
@@ -118,7 +130,10 @@ struct APIConfigEditor: View {
         .tint(SettingsTheme.accent).preferredColorScheme(.light)
         .onDisappear { testTask?.cancel(); apiKey = "" }
         .onChange(of: connectionIdentity) { _, _ in if !testing { testResult = nil } }
-        .onChange(of: sampleIndex) { _, _ in testResult = nil }
+        .onChange(of: sampleIndex) { _, index in sampleText = TextService.samples[index] }
+        .onChange(of: sampleText) { _, _ in testResult = nil }
+        .onChange(of: testMode) { _, _ in testResult = nil }
+        .onChange(of: app.preferences.textPrompts) { _, _ in testResult = nil }
     }
 
     private func field(_ title: String, value: Binding<String>) -> some View {
@@ -156,14 +171,16 @@ struct APIConfigEditor: View {
 
     private func runTest() {
         guard !testing, let snapshot = save() else { return }
-        let sample = TextService.samples[sampleIndex]
+        let sample = sampleText
+        let mode = testMode
+        let prompts = app.preferences.textPrompts ?? TextPrompts()
         let key: String?
         do { key = try app.configurations.apiKey(for: snapshot) }
         catch { self.error = error.localizedDescription; return }
         testing = true
         testResult = nil
         testTask = Task { @MainActor in
-            let result = await app.textService.process(sample, mode: .light, configuration: snapshot, apiKey: key)
+            let result = await app.textService.process(sample, mode: mode, configuration: snapshot, apiKey: key, prompts: prompts)
             testing = false
             guard !Task.isCancelled else { return }
             testResult = result

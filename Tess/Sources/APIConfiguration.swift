@@ -45,7 +45,18 @@ struct APIPreset: Identifiable, Sendable {
     let baseURL: String
     let help: String
     let documentation: String
-    var defaultModelID: String { id == "glm-free" ? "glm-4.7-flash" : "" }
+    var defaultModelID: String {
+        switch id {
+        case "deepseek": "deepseek-flash"
+        case "qwen": "qwen-plus"
+        case "glm", "glm-free": "glm-4.7-flash"
+        case "hunyuan": "hunyuan-turbos-latest"
+        case "tokenhub": "hy3"
+        case "qianfan": "ernie-4.5-turbo-32k"
+        case "spark": "4.0Ultra"
+        default: ""
+        }
+    }
 
     func configuration() -> APIConfiguration {
         var value = APIConfiguration()
@@ -58,23 +69,26 @@ struct APIPreset: Identifiable, Sendable {
         return value
     }
 
-    // Addresses are examples, checked against official documentation on 2026-10-08.
-    // The free trial preset supplies a model ID; every configuration still needs testing.
+    // Domestic addresses and example model IDs were checked against official docs on 2026-10-25.
+    // Account access and prices vary; every configuration still needs a real connection test.
     static let all: [APIPreset] = [
+        .init(id: "deepseek", name: "DeepSeek", protocolKind: .openAI, baseURL: "https://api.deepseek.com", help: "已填入 deepseek-flash，可改为账户支持的文字模型。思考模型可能较慢；仅使用最终正文。", documentation: "https://api-docs.deepseek.com/"),
+        .init(id: "qwen", name: "阿里云百炼 Qwen", protocolKind: .openAI, baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", help: "已填入 qwen-plus 与北京按量付费地址。其他地域或业务空间请使用配套地址与 API Key；Coding / Token Plan 密钥不能直接混用。", documentation: "https://help.aliyun.com/zh/model-studio/base-url"),
+        .init(id: "doubao", name: "火山方舟 豆包", protocolKind: .openAI, baseURL: "https://ark.cn-beijing.volces.com/api/v3", help: "填写文字模型或推理接入点 ID；与豆包 ASR 凭据独立。", documentation: "https://docs.volcengine.com/docs/ark/compatible-with-openai-sdk?lang=zh"),
+        .init(id: "kimi", name: "月之暗面 Kimi", protocolKind: .openAI, baseURL: "https://api.moonshot.cn/v1", help: "示例为国内 API；国际账户按控制台选择 api.moonshot.ai/v1。", documentation: "https://platform.kimi.com/docs/guide/migrating-from-openai-to-kimi"),
+        .init(id: "glm", name: "智谱 GLM", protocolKind: .openAI, baseURL: "https://open.bigmodel.cn/api/paas/v4", help: "已填入 GLM-4.7-Flash，可改为账户支持的模型。使用通用 API Key；Coding 套餐与国际地域地址可能不同。", documentation: "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction"),
+        .init(id: "glm-free", name: "智谱 GLM-4.7-Flash · 试用", protocolKind: .openAI, baseURL: "https://open.bigmodel.cn/api/paas/v4", help: "登录智谱创建自己的 API Key 后测试。用量价格、赠送额度与限流以官方控制台为准；更换模型或地址后请重新核对。", documentation: "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.7-flash"),
+        .init(id: "minimax", name: "MiniMax", protocolKind: .openAI, baseURL: "https://api.minimax.cn/v1", help: "使用国内平台 API Key 与已开通的模型 ID；国际账户使用 https://api.minimax.io/v1。思考模型可能较慢，仅使用最终正文。", documentation: "https://platform.minimax.cn/docs/api-reference/text-openai-api"),
+        .init(id: "tokenhub", name: "腾讯 TokenHub · 混元等模型", protocolKind: .openAI, baseURL: "https://tokenhub.tencentmaas.com/v1", help: "已填入 hy3 与广州地域地址。使用 TokenHub API Key；模型和密钥须属于同一地域，新加坡账户请按官方说明更改地址。", documentation: "https://cloud.tencent.com/document/product/1823/130078"),
+        .init(id: "hunyuan", name: "腾讯混元 · 原平台", protocolKind: .openAI, baseURL: "https://api.hunyuan.cloud.tencent.com/v1", help: "保留给原混元平台已购买服务的账户，使用原平台 API Key。新开通服务请选择腾讯 TokenHub 预设。", documentation: "https://cloud.tencent.com/document/product/1729/111007"),
+        .init(id: "qianfan", name: "百度千帆 文心", protocolKind: .openAI, baseURL: "https://qianfan.baidubce.com/v2", help: "已填入 ernie-4.5-turbo-32k，可改为已开通的模型。使用 v2 API Key，不使用旧 access_token。", documentation: "https://cloud.baidu.com/doc/qianfan-docs/s/Fm9l6ocai"),
+        .init(id: "spark", name: "讯飞星火", protocolKind: .openAI, baseURL: "https://spark-api-open.xf-yun.com/v1", help: "已填入 4.0Ultra。请在 API Key 一栏填写对应模型版本的 HTTP APIPassword；它与 WebSocket 的 APIKey / APISecret 不同。", documentation: "https://www.xfyun.cn/doc/spark/HTTP调用文档.html"),
+        .init(id: "stepfun", name: "阶跃星辰 StepFun", protocolKind: .openAI, baseURL: "https://api.stepfun.com/v1", help: "填写开放平台的 API Key 和已开通的文字模型 ID。此地址为国内按量 API；国际账户和 Step Plan 请核对各自的地址及用量规则。", documentation: "https://platform.stepfun.com/"),
+        .init(id: "siliconflow", name: "硅基流动 · 聚合平台", protocolKind: .openAI, baseURL: "https://api.siliconflow.cn/v1", help: "文字发往硅基流动，由平台提供所选模型。请从模型列表复制完整 ID，保留厂商前缀及可能的 Pro/ 前缀。", documentation: "https://docs.siliconflow.cn/docs/userguide/capabilities/text-generation"),
         .init(id: "openai", name: "OpenAI", protocolKind: .openAI, baseURL: "https://api.openai.com/v1", help: "选择支持 Chat Completions 的文字模型。", documentation: "https://developers.openai.com/api/reference/chat/create"),
         .init(id: "anthropic", name: "Anthropic Claude", protocolKind: .anthropic, baseURL: "https://api.anthropic.com/v1", help: "使用 Claude API Key；多工作空间密钥需填写 Workspace ID。", documentation: "https://platform.claude.com/docs/en/api/overview"),
         .init(id: "gemini", name: "Google Gemini", protocolKind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", help: "使用 Gemini API Key 与官方兼容接口。", documentation: "https://ai.google.dev/gemini-api/docs/openai"),
-        .init(id: "deepseek", name: "DeepSeek", protocolKind: .openAI, baseURL: "https://api.deepseek.com", help: "选择 Chat Completions 文字模型；仅使用最终正文。", documentation: "https://api-docs.deepseek.com/guides/codex"),
-        .init(id: "qwen", name: "阿里云百炼 Qwen", protocolKind: .openAI, baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", help: "示例为北京地域。请按账户地域、业务空间与计费方案更改地址，配套使用 API Key。", documentation: "https://help.aliyun.com/en/model-studio/base-url"),
-        .init(id: "doubao", name: "火山方舟 豆包", protocolKind: .openAI, baseURL: "https://ark.cn-beijing.volces.com/api/v3", help: "填写文字模型或推理接入点 ID；与豆包 ASR 凭据独立。", documentation: "https://docs.volcengine.com/docs/ark/compatible-with-openai-sdk?lang=zh"),
-        .init(id: "kimi", name: "月之暗面 Kimi", protocolKind: .openAI, baseURL: "https://api.moonshot.cn/v1", help: "示例为国内 API；国际账户按控制台选择 api.moonshot.ai/v1。", documentation: "https://platform.kimi.com/docs/guide/migrating-from-openai-to-kimi"),
-        .init(id: "glm", name: "智谱 GLM", protocolKind: .openAI, baseURL: "https://open.bigmodel.cn/api/paas/v4", help: "示例为通用 API，Coding 套餐与国际地域地址可能不同。", documentation: "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction"),
-        .init(id: "glm-free", name: "智谱 GLM-4.7-Flash · 免费试用", protocolKind: .openAI, baseURL: "https://open.bigmodel.cn/api/paas/v4", help: "此模型官方当前免费，仍需登录智谱创建自己的 API Key，并受服务限流约束。仅待整理文字发往智谱。更换模型或地址后请重新核对价格。", documentation: "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.7-flash"),
-        .init(id: "minimax", name: "MiniMax", protocolKind: .openAI, baseURL: "https://api.minimax.cn/v1", help: "按国内或国际账户核对地址；国际 API 示例为 https://api.minimax.io/v1。", documentation: "https://platform.minimax.cn/docs/api-reference/text-openai-api"),
-        .init(id: "hunyuan", name: "腾讯混元", protocolKind: .openAI, baseURL: "https://api.hunyuan.cloud.tencent.com/v1", help: "此地址用于原混元平台 API Key；新购服务迁移至 TokenHub，请按控制台填写兼容地址。", documentation: "https://cloud.tencent.com/document/product/1729/111007"),
-        .init(id: "qianfan", name: "百度千帆 文心", protocolKind: .openAI, baseURL: "https://qianfan.baidubce.com/v2", help: "使用 v2 API Key 与模型名，不使用旧 access_token。", documentation: "https://cloud.baidu.com/doc/qianfan-docs/s/Fm9l6ocai"),
         .init(id: "xai", name: "xAI Grok", protocolKind: .openAI, baseURL: "https://api.x.ai/v1", help: "选择支持 Chat Completions 的文字模型。", documentation: "https://docs.x.ai/developers/rest-api-reference/inference/chat-completions"),
-        .init(id: "siliconflow", name: "硅基流动 · 聚合平台", protocolKind: .openAI, baseURL: "https://api.siliconflow.cn/v1", help: "文字发往硅基流动，由平台提供所选模型。", documentation: "https://docs.siliconflow.cn/docs/userguide/quickstart"),
         .init(id: "openrouter", name: "OpenRouter · 聚合平台", protocolKind: .openAI, baseURL: "https://openrouter.ai/api/v1", help: "文字发往 OpenRouter，由平台路由所选模型。", documentation: "https://openrouter.ai/docs/quickstart"),
         .init(id: "ollama", name: "Ollama · 本机", protocolKind: .openAI, baseURL: "http://127.0.0.1:11434/v1", help: "先自行安装模型并启动 Ollama；本机服务是否转发由服务本身决定。", documentation: "https://docs.ollama.com/api/openai-compatibility"),
         .init(id: "custom", name: "自定义兼容服务", protocolKind: .openAI, baseURL: "", help: "填写接口根地址，云端须 HTTPS；HTTP 仅允许本机回环地址。", documentation: "")

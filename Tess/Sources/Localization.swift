@@ -12,6 +12,7 @@ struct AppPreferences: Codable {
   var holdToRecord = true
   var alwaysPreview = false
   var textMode: TextMode = .raw
+  var textPrompts: TextPrompts? = nil
   var recognitionLanguage = "auto"
   var bindings: [ShortcutAction: ShortcutBinding] = Dictionary(uniqueKeysWithValues: ShortcutAction.allCases.map { ($0, $0.defaults) })
   var shortcutVersion: Int? = nil

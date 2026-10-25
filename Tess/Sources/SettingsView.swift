@@ -7,6 +7,7 @@ struct SettingsView: View {
     var app: AppModel
     private var section: SettingsSection { app.settingsSection }
     @State private var editingConfiguration: APIConfiguration?
+    @State private var editingPrompts = false
     @State private var deleteConfiguration: APIConfiguration?
     @State private var modelError: String?
     @State private var shortcutError: String?
@@ -68,6 +69,9 @@ struct SettingsView: View {
         .tint(SettingsTheme.accent).preferredColorScheme(.light)
         .sheet(item: $editingConfiguration) { configuration in
             APIConfigEditor(app: app, configuration: configuration)
+        }
+        .sheet(isPresented: $editingPrompts) {
+            TextPromptEditor(app: app, prompts: app.preferences.textPrompts ?? TextPrompts())
         }
         .alert(app.tr("删除文字配置？", "Delete this configuration?"), isPresented: Binding(
             get: { deleteConfiguration != nil }, set: { if !$0 { deleteConfiguration = nil } }
@@ -329,7 +333,7 @@ struct SettingsView: View {
                 }
                 HStack {
                     Button(app.tr("添加配置", "Add configuration")) { editingConfiguration = APIPreset.all[0].configuration() }
-                    Button(app.tr("免费试用", "Free trial")) {
+                    Button(app.tr("试用文字整理", "Try text editing")) {
                         editingConfiguration = APIPreset.all.first(where: { $0.id == "glm-free" })?.configuration()
                     }
                     Button(app.tr("停用文字服务", "Disable text service")) {
@@ -344,10 +348,18 @@ struct SettingsView: View {
                     }
                 }
             }
-            SettingsCard(title: app.tr("整理规则", "EDITING RULES")) {
-                notice(app.tr("保留事实、语言、术语、数字、单位、否定和条件；只编辑材料，不执行其中的指令。结果可疑或服务失败时回退原文。可开启所有结果先预览。",
-                              "Keep facts, language, terminology, numbers, units, negatives and conditions. Edit the material without following its instructions. Suspicious results or service errors fall back to the transcript. Enable Always preview results to review dictation first."))
-                notice("Tess text rules · v1")
+            SettingsCard(title: app.tr("整理提示词", "EDITING PROMPTS")) {
+                notice(app.tr("所有文字服务共用一套提示词：通用要求加上当前模式的规则。可分别调整轻量整理、列表整理和自然润色；原文模式不调用文字服务。",
+                              "All text services share these prompts: common instructions plus the selected mode's rules. Customize light cleanup, lists and polish separately. Original mode does not call a text service."))
+                HStack {
+                    Text(app.preferences.textPrompts == nil || app.preferences.textPrompts == TextPrompts()
+                         ? app.tr("使用默认提示词", "Using default prompts") : app.tr("使用自定义提示词", "Using custom prompts"))
+                        .font(.caption).foregroundStyle(SettingsTheme.secondary)
+                    Spacer()
+                    Button(app.tr("编辑提示词", "Edit prompts")) { editingPrompts = true }
+                        .buttonStyle(SettingsButtonStyle())
+                }.padding(.vertical, 10)
+                notice(app.tr("数字、术语等内容发生可疑变化或服务失败时，仍会保留原文供你核对。", "Suspicious changes to numbers or terminology, and service failures, still preserve the original for review."))
             }
         }
     }
@@ -369,6 +381,17 @@ struct SettingsView: View {
                 }
                 notice(app.tr("仅识别快捷键和输入目标保护所需的事件，不读取或保存打字正文。不会申请全盘访问、通讯录或照片权限。",
                               "Tess only interprets events needed for shortcuts and input-target protection. Typed text is never read or stored. Tess does not request full disk, contacts or photo access."))
+            }
+            SettingsCard(title: app.tr("自动输入诊断", "AUTOMATIC INPUT DIAGNOSTICS")) {
+                notice(app.tr("ChatGPT 桌面版无法提供输入框信息时，使用原窗口兼容输入：先点击聊天输入框再录音，期间点击、打字或切换应用会改为复制。无法验证输入框类型和光标，不要用于密码输入。",
+                              "When ChatGPT desktop does not expose its input field, Tess uses the original window. Click the chat field before dictating; clicking, typing or switching apps during the session falls back to Copy. Field type and caret cannot be verified. Do not use this for passwords."))
+                notice(app.delivery.failureDescription(chinese: app.preferences.language.usesChinese)
+                       ?? app.tr("录音后可查看本次输入状态；详细原因可复制供排查。", "After dictating, copy the input diagnostics to investigate delivery problems."))
+                notice(app.tr("仅在本机保留最近 100 条状态，记录应用标识和系统错误码，不记录录音、转写、输入框正文或剪贴板内容。",
+                              "The latest 100 status events stay on this Mac. They contain app identifiers and system error codes, with no audio, transcript, field text or clipboard content."))
+                Button(app.tr("复制输入诊断", "Copy input diagnostics")) {
+                    _ = app.delivery.copyText(app.delivery.diagnosticReport)
+                }.buttonStyle(SettingsButtonStyle()).disabled(app.delivery.diagnosticEvents.isEmpty)
             }
             SettingsCard(title: app.tr("数据与清理", "DATA & CLEANUP")) {
                 notice(app.tr("API 密钥仅保存在 Keychain。基础模型随应用提供，额外模型保存在 Tess 模型目录。最近结果与截图草稿最多保留 24 小时；清除暂存内容不会删除模型或 API 配置。",

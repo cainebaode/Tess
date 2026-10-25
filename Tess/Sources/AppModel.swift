@@ -27,7 +27,7 @@ enum SessionPhase: Equatable {
   let recorder = AudioRecorder()
   let hotkeys = HotkeyService()
   let capture: CaptureService
-  let delivery = DeliveryService()
+  let delivery: DeliveryService
   let textService = TextService()
   let directory: URL
   @ObservationIgnored private let localStore: LocalStore
@@ -147,6 +147,7 @@ enum SessionPhase: Equatable {
     #endif
     let store = LocalStore(directory: directory)
     localStore = store
+    delivery = DeliveryService(diagnosticURL: directory.appendingPathComponent("Diagnostics/input.json"))
     var loadedPreferences = AppPreferences()
     if case .value(let value) = store.read(AppPreferences.self, name: "preferences.json") { loadedPreferences = value }
     loadedPreferences.migrate()
@@ -209,6 +210,7 @@ enum SessionPhase: Equatable {
     interruptedObservers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
       Task { @MainActor in self?.hotkeys.refreshFn() }
     })
+    delivery.startDesktopAccessibilityPreparation()
   }
 
   func tr(_ chinese: String, _ english: String) -> String { preferences.language.usesChinese ? chinese : english }
@@ -225,6 +227,13 @@ enum SessionPhase: Equatable {
     preferences.asrModel = asr.selectedModel
     preferences.microphoneID = recorder.selectedDeviceID
     persist(preferences, name: "preferences.json")
+  }
+  @discardableResult func saveTextPrompts(_ prompts: TextPrompts) -> Bool {
+    var next = preferences
+    next.textPrompts = prompts
+    guard persist(next, name: "preferences.json") else { return false }
+    preferences = next
+    return true
   }
   func setShortcut(_ action: ShortcutAction, binding: ShortcutBinding?) -> Bool {
     if let binding, preferences.bindings.contains(where: { $0.key != action && $0.value == binding }) {
@@ -492,7 +501,8 @@ enum SessionPhase: Equatable {
     if mode != .raw {
       phase = .processing
       status = tr("正在整理…", "Cleaning up…")
-      let processed = await textService.process(current.original, mode: mode, configuration: snapshotConfig, apiKey: snapshotKey)
+      let processed = await textService.process(current.original, mode: mode, configuration: snapshotConfig, apiKey: snapshotKey,
+                                               prompts: snapshot?.textPrompts ?? TextPrompts())
       guard sessionID == id, !Task.isCancelled, !processed.isCancelled else { return }
       draft?.output = processed.output
       draft?.candidate = processed.candidate
@@ -708,7 +718,9 @@ enum SessionPhase: Equatable {
   private func deliveryMessage(_ outcome: DeliveryService.Outcome) -> String {
     switch outcome {
     case .attemptedPaste: tr("已尝试粘贴，请在目标应用确认。", "Paste attempted. Check the destination app.")
-    case .copiedToClipboard: tr("已复制，回到输入框后按 ⌘V 粘贴。", "Copied. Return to the text field and press ⌘V.")
+    case .copiedToClipboard:
+      (delivery.failureDescription(chinese: preferences.language.usesChinese).map { $0 + tr("。", ". ") } ?? "")
+        + tr("已复制，回到输入框后按 ⌘V 粘贴。", "Copied. Return to the text field and press ⌘V.")
     case .unavailable(let message): message
     }
   }

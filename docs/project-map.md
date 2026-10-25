@@ -45,8 +45,8 @@ flowchart TD
 | 快捷键 | `HotkeyService.swift` | Fn 与组合键、按下／释放、取消及会话中断后的恢复 |
 | 录音 | `AudioRecorder.swift`、`AudioLevelMeter.swift` | 麦克风、音频缓冲、时长和音量 |
 | 本地识别 | `ASRService.swift` | Qwen／Whisper 的模型管理、准备、中间与最终识别 |
-| 文字整理 | `TextService.swift`、`APIConfiguration.swift` | 原文／轻量整理／列表／润色，外部 API 配置和密钥引用 |
-| 外部输入 | `DeliveryService.swift` | 识别输入目标、粘贴、剪贴板回退及微信窗口兼容保护 |
+| 文字整理 | `TextService.swift`、`APIConfiguration.swift`、`TextPromptEditor.swift` | 原文／轻量整理／列表／润色，外部 API 配置、密钥引用及共用提示词编辑 |
+| 外部输入 | `DeliveryService.swift` | 识别输入目标、粘贴、剪贴板回退及微信／ChatGPT 窗口兼容保护 |
 | 原位截图 | `CaptureService.swift`、`ScreenshotSelection.swift`、`ScreenshotEditorView.swift` | ScreenCaptureKit 快照、选区坐标、调暗层、标注、图片存储及复制 |
 | 本地存储 | `LocalStore.swift` | 设置与结果文件、写入恢复及损坏文件的恢复副本 |
 | 界面 | `SettingsView.swift`、`OnboardingView.swift`、`ResultView.swift`、`HUDView.swift` 等 | 设置、引导、结果与录音浮层 |
@@ -69,14 +69,20 @@ flowchart TD
 - `api-configurations.json`：文字服务配置；API Key 本身在 macOS Keychain。
 - `Models/`：用户主动下载的模型；有效下载模型优先，否则可使用随包基础模型。
 - `Captures/`：选区图片暂存；`Recovery/`：存储恢复副本。
+- `Diagnostics/input.json`：最近 100 条自动输入状态，包含应用标识、build、系统错误码及有限角色信息，不包含录音、转写、输入框正文或剪贴板内容。
 
-已安装应用为 `/Applications/Tess.app`。项目候选、归档、正式 DMG 和用户数据是不同位置，更新安装不等于重置用户数据。
+应用安装路径为 `/Applications/Tess.app`。2026-10-25 曾按用户要求卸载，之后重新安装 build 25，再依次更新为 build 26、build 27、build 28。当前为 build 28。项目候选、归档、正式 DMG 和用户数据是不同位置，更新安装不等于重置用户数据。
 
 ## 本机产物与回退
 
+**2026-10-25 后续变更：** 用户要求全部卸载重装时，下表中的 `.app` 副本曾被移除，运行数据曾移出原目录；原位置与过程保存在本机 `evidence/20261025-tess-uninstall/removed-applications.json`，详见 [卸载记录](releases/20261025-03-tess-local-uninstall.md)。之后本机重新安装 build 25。文字服务迭代后安装 build 26，当前针对 ChatGPT 缺失焦点输入框已安装 build 28，build 27 作为紧邻回退保留，见 [原窗口输入迭代](releases/20261025-06-tess-chatgpt-window-input.md)；其余历史条目仍只说明原产物位置。
+
 | 位置 | 内容 |
 | --- | --- |
-| `.build/local/0.2.0-build25/Tess.app` | 与当前本机版本对应的完整候选 |
+| `.build/local/0.2.0-build28/Tess.app` | 本轮原窗口输入候选，已签名并安装；ChatGPT 实际输入待用户人工验收 |
+| `.build/local/0.2.0-build27/Tess.app` | 诊断版；ChatGPT 自动输入未通过，作为紧邻回退保留 |
+| `.build/local/0.2.0-build26/Tess.app` | 早期文字服务候选，保留 |
+| `.build/local/0.2.0-build25/Tess.app` | 本轮更新前从已安装应用保留的回退副本 |
 | `.build/local/0.2.0-build24/Tess.app` | 紧邻回退 |
 | `.build/local/0.2.0-build21/Tess.app` | 用户曾确认整体可用的早期截图版 |
 | `.build/releases/0.2.0-build25/20261024/` | 本轮正式离线归档、已公证 App、DMG 公证容器及暂存；上传专用容器不安装或交付 |

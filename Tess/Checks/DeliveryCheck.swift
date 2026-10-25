@@ -2,14 +2,14 @@ import AppKit
 import Carbon
 
 @main @MainActor struct DeliveryCheck {
-    static func checkWeChatInteractionGuard() {
+    static func checkCompatibilityInteractionGuard() {
         func event(_ code: UInt16 = 0, _ flags: CGEventFlags = []) -> CGEvent {
             let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: true)!
             event.flags = flags
             return event
         }
-        func fnGuard() -> WeChatInteractionGuard {
-            WeChatInteractionGuard(processID: 123, shortcut: (63, 0))
+        func fnGuard() -> InputInteractionGuard {
+            InputInteractionGuard(processID: 123, shortcut: (63, 0))
         }
         let fn = fnGuard()
         for _ in 0..<2 {
@@ -29,12 +29,12 @@ import Carbon
         let modifiers = UInt32(controlKey | optionKey)
         for keyCode: UInt32 in [49, 179] {
             for type: CGEventType in [.keyDown, .keyUp] {
-                let guardState = WeChatInteractionGuard(processID: 123, shortcut: (keyCode, modifiers))
+                let guardState = InputInteractionGuard(processID: 123, shortcut: (keyCode, modifiers))
                 guardState.process(type, event(179, [.maskControl, .maskAlternate]))
                 precondition(!guardState.isValid, "Globe events are exempt only during an Fn recording")
             }
         }
-        let custom = WeChatInteractionGuard(processID: 123, shortcut: (49, modifiers))
+        let custom = InputInteractionGuard(processID: 123, shortcut: (49, modifiers))
         // Start happened before monitoring. Modifiers may be released before the principal key.
         custom.process(.flagsChanged, event(58))
         custom.process(.keyUp, event(49))
@@ -48,7 +48,7 @@ import Carbon
         precondition(!custom.isValid, "The same key without its shortcut modifiers is ordinary input")
         for (code, flags) in [(UInt16(0), CGEventFlags([.maskControl, .maskAlternate])),
                                (UInt16(49), CGEventFlags([.maskControl, .maskAlternate, .maskShift]))] {
-            let guardState = WeChatInteractionGuard(processID: 123, shortcut: (49, modifiers))
+            let guardState = InputInteractionGuard(processID: 123, shortcut: (49, modifiers))
             guardState.process(.keyDown, event(code, flags))
             precondition(!guardState.isValid, "Only the exact configured chord is exempt")
         }
@@ -64,7 +64,7 @@ import Carbon
         stopped.applicationActivated(123)
         stopped.process(.flagsChanged, event(63))
         precondition(!stopped.isValid && !stopped.start(), "A closed session cannot be rearmed")
-        weak var released: WeChatInteractionGuard?
+        weak var released: InputInteractionGuard?
         do {
             let guardState = fnGuard()
             released = guardState
@@ -74,7 +74,51 @@ import Carbon
     }
 
     static func main() async {
-        checkWeChatInteractionGuard()
+        checkCompatibilityInteractionGuard()
+        // Reproduce the user's AX noValue without querying a real application.
+        for error in [AXError.noValue, .attributeUnsupported] {
+            precondition(DeliveryService.allowsChatGPTWindowCompatibility(applicationID: "com.openai.codex",
+                hasFocusedElement: false, error: error))
+        }
+        for error in [AXError.success, .cannotComplete, .apiDisabled, .notImplemented, .invalidUIElement] {
+            precondition(!DeliveryService.allowsChatGPTWindowCompatibility(applicationID: "com.openai.codex",
+                hasFocusedElement: false, error: error))
+        }
+        for applicationID in [nil, "com.openai.chat", "com.google.Chrome", "com.tencent.xinWeChat"] {
+            precondition(!DeliveryService.allowsChatGPTWindowCompatibility(applicationID: applicationID,
+                hasFocusedElement: false, error: .noValue))
+        }
+        precondition(!DeliveryService.allowsChatGPTWindowCompatibility(applicationID: "com.openai.codex",
+            hasFocusedElement: true, error: .noValue), "A present input that fails normal validation must never use the window fallback")
+        func window(_ id: UInt32, pid: Int32 = 123, layer: Int = 0, alpha: Double = 1, bounds: CGRect = CGRect(x: 100, y: 200, width: 600, height: 400)) -> [String: Any] {
+            [kCGWindowNumber as String: NSNumber(value: id), kCGWindowOwnerPID as String: NSNumber(value: pid),
+             kCGWindowLayer as String: NSNumber(value: layer), kCGWindowAlpha as String: NSNumber(value: alpha),
+             kCGWindowBounds as String: bounds.dictionaryRepresentation]
+        }
+        let selectedWindow = DeliveryService.visibleWindow(processID: 123, windows: [
+            window(1, pid: 456), window(2, layer: 3), window(3, alpha: 0), window(4, bounds: .zero), window(0), window(5), window(6)
+        ])
+        precondition(selectedWindow?.id == 5 && selectedWindow?.center == CGPoint(x: 400, y: 400))
+        precondition(DeliveryService.visibleWindow(processID: 123, windows: [window(7), window(5)])?.id != selectedWindow?.id,
+                     "Switching to another window in the same app must invalidate the recorded window")
+        precondition(DeliveryService.visibleWindow(processID: 123, windows: [window(1, pid: 456)]) == nil)
+        // A cold desktop renderer exposes its input only after this request. Keep the
+        // request restricted to the two ChatGPT app identifiers, and preserve errors.
+        for applicationID in ["com.openai.codex", "com.openai.chat"] {
+            var prepared = false
+            let result = DeliveryService.prepareDesktopAccessibility(applicationID: applicationID) { attribute in
+                precondition(attribute == "AXManualAccessibility")
+                prepared = true
+                return .success
+            }
+            precondition(prepared && result == .success)
+            precondition(DeliveryService.prepareDesktopAccessibility(applicationID: applicationID,
+                setAttribute: { _ in .attributeUnsupported }) == .attributeUnsupported)
+        }
+        for applicationID in [nil, "com.google.Chrome", "com.apple.TextEdit", "com.tencent.xinWeChat"] {
+            precondition(DeliveryService.prepareDesktopAccessibility(applicationID: applicationID,
+                setAttribute: { _ in preconditionFailure("Other applications must keep their existing AX behavior") }) == nil)
+        }
         // TextEdit's editable NSTextView omits AXEnabled; explicit disabled/error states still reject.
         precondition(DeliveryService.allowsEditing(enabled: nil, error: .attributeUnsupported))
         precondition(DeliveryService.allowsEditing(enabled: true, error: .success))
@@ -181,6 +225,28 @@ import Carbon
         let unavailableTarget = await delivery.deliverVoice(text: "可恢复的结果", target: nil)
         guard case .copiedToClipboard = unavailableTarget else { preconditionFailure("Expected recovery copy") }
         precondition(pasteboard.string(forType: .string) == "可恢复的结果")
-        print("Delivery checks passed: WeChat interaction invalidation, Fn-only Globe event exemption and custom shortcut protections, single attempt, multi-type restoration, concurrent copy, target change, cancellation, rapid reentry, oversized clipboard protection and unavailable-target recovery. Synthetic event metadata, isolated pasteboard and local callbacks only; no live event tap, target, keyboard, microphone or user clipboard used.")
+
+        // Persistent diagnostics must stay bounded, survive restart and exclude text.
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("TessInputDiagnostics-" + UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let diagnosticURL = directory.appendingPathComponent("Diagnostics/input.json")
+        let diagnosticDelivery = DeliveryService(pasteboard: pasteboard, diagnosticURL: diagnosticURL)
+        let privateText = "private-transcript-must-not-appear-" + UUID().uuidString
+        for _ in 0..<105 { _ = await diagnosticDelivery.deliverVoice(text: privateText, target: nil) }
+        let diagnosticData = try! Data(contentsOf: diagnosticURL)
+        let stored = try! JSONDecoder().decode([DeliveryService.DiagnosticEvent].self, from: diagnosticData)
+        precondition(stored.count == 100 && stored.allSatisfy { $0.code == "copied_fallback" })
+        precondition(!String(decoding: diagnosticData, as: UTF8.self).contains(privateText))
+        precondition(!diagnosticDelivery.diagnosticReport.contains(privateText))
+        let reloaded = DeliveryService(pasteboard: pasteboard, diagnosticURL: diagnosticURL)
+        precondition(reloaded.diagnosticEvents.count == 100)
+        let countBeforeCancellation = diagnosticDelivery.diagnosticReport
+        let cancelledDiagnostic = Task { @MainActor in
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await diagnosticDelivery.deliverVoice(text: privateText, target: nil)
+        }
+        guard case .unavailable = await cancelledDiagnostic.value else { preconditionFailure("Cancellation must not write diagnostics or copy text") }
+        precondition(diagnosticDelivery.diagnosticReport == countBeforeCancellation)
+        print("Delivery checks passed: ChatGPT missing-focus window eligibility, application/error scope, front-window identity and filtering, shared WeChat/ChatGPT Fn interaction protections, AX preparation, bounded private-text-free diagnostics, clipboard restoration, target changes and cancellation. Synthetic window metadata, isolated callbacks and pasteboard only; no live window/AX queries, event tap, keyboard, microphone or user clipboard used.")
     }
 }

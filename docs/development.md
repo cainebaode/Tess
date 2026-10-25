@@ -6,6 +6,14 @@
 
 ## 当前状态
 
+2026-10-25 最新：**0.2.0 build 28 已签名、经 Finder 覆盖安装并启动。** 用户的 build 27 诊断确认 ChatGPT `com.openai.codex` 不提供焦点输入框（AX `noValue`），辅助功能准备请求不受支持。本轮新增仅用于该应用、该错误条件的原窗口兼容输入，按原窗口 ID 和会话操作监测保护；点击、打字、切换窗口或应用后改为复制。构建、输入相关检查、签名、模型和安装一致性通过，实际 Fn 输入仍待用户确认。详见 [ChatGPT 原窗口输入](releases/20261025-06-tess-chatgpt-window-input.md)。本轮未公证、制作 DMG 或公开发布；公开下载仍为 build 25。
+
+2026-10-25 上一轮：**0.2.0 build 27 已使用原 Developer ID 签名并经 Finder 覆盖安装、启动。** 针对 ChatGPT 桌面版补上辅助功能信息预准备，并增加不含正文的输入诊断、复制回退原因及诊断复制入口。构建、相关隔离检查、签名和安装一致性通过；ChatGPT 的实际 Fn 输入由用户测试确认。详见 [桌面输入诊断与兼容迭代](releases/20261025-05-tess-chatgpt-input.md)。本轮没有公证、DMG 或公开发布，公开下载仍为 build 25。
+
+2026-10-25 本轮：**0.2.0 build 26 已使用原 Developer ID 签名并经 Finder 覆盖安装、启动。** 国内文字服务预设覆盖 11 家；通用及三种整理模式的提示词可编辑、恢复默认，样例测试可选择模式和编辑文字。本地语音识别保留。构建、隔离检查、签名及安装一致性通过，真实 API 连通与人工使用验收待用户完成；本轮没有公证、DMG 或公开发布。详见 [文字服务与提示词](releases/20261025-04-tess-text-api-prompts.md)。公开下载仍为 build 25。
+
+2026-10-25 后续：用户要求卸载重装。`/Applications/Tess.app` 与全部 36 个本机历史／检查应用副本已移除；运行数据已移出原目录并备份。当前未安装 Tess，等待用户重新下载安装。源码、正式 DMG 与公开 Releases 保留。见 [本机卸载记录](releases/20261025-03-tess-local-uninstall.md)。
+
 2026-10-25：[Tess 产品站](https://tess.baode.life/) 已上线，[公开下载仓库](https://github.com/cainebaode/Tess) 已完成 build 25 公开下载发布；文件大小与完整 SHA-256、公开下载及校验文件均已核对。接入与下载状态见 [网站与下载发布记录](releases/20261025-01-tess-website-and-download.md)。
 
 2026-10-24：**Tess 0.2.0 build 25 正式离线安装包已完成，并已从实际下载的最终 DMG 经 Finder 覆盖安装至 `/Applications/Tess.app`、启动。**
