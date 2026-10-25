@@ -79,7 +79,7 @@ flowchart TD
 
 | 位置 | 内容 |
 | --- | --- |
-| `.build/local/0.2.0-build28/Tess.app` | 本轮原窗口输入候选，已签名并安装；ChatGPT 实际输入待用户人工验收 |
+| `.build/local/0.2.0-build28/Tess.app` | 本轮原窗口输入候选，已签名并安装；用户已确认 ChatGPT Fn 自动输入正常 |
 | `.build/local/0.2.0-build27/Tess.app` | 诊断版；ChatGPT 自动输入未通过，作为紧邻回退保留 |
 | `.build/local/0.2.0-build26/Tess.app` | 早期文字服务候选，保留 |
 | `.build/local/0.2.0-build25/Tess.app` | 本轮更新前从已安装应用保留的回退副本 |

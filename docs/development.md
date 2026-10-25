@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-2026-10-25 最新：**0.2.0 build 28 已签名、经 Finder 覆盖安装并启动。** 用户的 build 27 诊断确认 ChatGPT `com.openai.codex` 不提供焦点输入框（AX `noValue`），辅助功能准备请求不受支持。本轮新增仅用于该应用、该错误条件的原窗口兼容输入，按原窗口 ID 和会话操作监测保护；点击、打字、切换窗口或应用后改为复制。构建、输入相关检查、签名、模型和安装一致性通过，实际 Fn 输入仍待用户确认。详见 [ChatGPT 原窗口输入](releases/20261025-06-tess-chatgpt-window-input.md)。本轮未公证、制作 DMG 或公开发布；公开下载仍为 build 25。
+2026-10-25 最新：**0.2.0 build 28 已签名、经 Finder 覆盖安装并启动。** 用户的 build 27 诊断确认 ChatGPT `com.openai.codex` 不提供焦点输入框（AX `noValue`），辅助功能准备请求不受支持。本轮新增仅用于该应用、该错误条件的原窗口兼容输入，按原窗口 ID 和会话操作监测保护；点击、打字、切换窗口或应用后改为复制。构建、输入相关检查、签名、模型和安装一致性通过；用户随后确认 build 28 在 ChatGPT 桌面版的 Fn 自动输入正常。详见 [ChatGPT 原窗口输入](releases/20261025-06-tess-chatgpt-window-input.md)。本轮未公证、制作 DMG 或公开发布；公开下载仍为 build 25。
 
 2026-10-25 上一轮：**0.2.0 build 27 已使用原 Developer ID 签名并经 Finder 覆盖安装、启动。** 针对 ChatGPT 桌面版补上辅助功能信息预准备，并增加不含正文的输入诊断、复制回退原因及诊断复制入口。构建、相关隔离检查、签名和安装一致性通过；ChatGPT 的实际 Fn 输入由用户测试确认。详见 [桌面输入诊断与兼容迭代](releases/20261025-05-tess-chatgpt-input.md)。本轮没有公证、DMG 或公开发布，公开下载仍为 build 25。
 
