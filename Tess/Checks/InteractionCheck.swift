@@ -181,7 +181,7 @@ enum ASRError: Error { case silence, isolatedFailure }
 }
 
 @main @MainActor struct InteractionCheck {
-    private static func checkPromptPreferences(root: URL) throws {
+    private static func checkPromptPreferences(root: URL) async throws {
         var previous = AppPreferences()
         previous.language = .english
         previous.holdToRecord = false
@@ -205,18 +205,57 @@ enum ASRError: Error { case silence, isolatedFailure }
         precondition(restored.asrModel == previous.asrModel && restored.microphoneID == previous.microphoneID)
 
         let scenario = try Scenario(root: root)
-        let prompts = TextPrompts(common: "保留中英混合。", light: "只补标点。", list: "已有项目逐条列出。", polish: "使用我的表达习惯。")
-        precondition(scenario.app.saveTextPrompts(prompts))
+        var prompts = TextPrompt.defaults
+        let custom = TextPrompt(name: "我的英文摘要", instructions: "提炼为三条英文要点。")
+        prompts.append(custom)
+        precondition(scenario.app.savePromptLibrary(prompts))
+        precondition(scenario.app.setPrompt(custom.id, for: .custom1))
+        precondition(scenario.app.setPrompt(custom.id, for: .custom2), "Both shortcuts may share a prompt")
+        precondition(!scenario.app.savePromptLibrary(prompts.filter { $0.id != custom.id }), "Bound prompts cannot be removed")
+        precondition(!scenario.app.savePromptLibrary(prompts + [custom]), "Prompt IDs must be unique")
+        precondition(!scenario.app.savePromptLibrary(prompts + [TextPrompt(name: "", instructions: "内容")]))
+        precondition(!scenario.app.savePromptLibrary(prompts + [TextPrompt(name: "名称", instructions: " \n")]))
+        precondition(!scenario.app.setShortcut(.record, binding: nil), "Fn cannot be removed")
+        precondition(!scenario.app.setShortcut(.custom1, binding: .fn), "Fn stays reserved for plain dictation")
         let preferencesFile = scenario.app.directory.appendingPathComponent("preferences.json")
         let persisted = try JSONDecoder().decode(AppPreferences.self, from: Data(contentsOf: preferencesFile))
-        precondition(persisted.textPrompts == prompts, "Saving preferences must retain all four prompt fields")
+        precondition(persisted.availablePrompts == prompts && persisted.prompt(for: .custom1) == custom && persisted.prompt(for: .custom2) == custom)
         let reopened = AppModel()
-        precondition(reopened.preferences.textPrompts == prompts, "App startup must restore custom prompts")
+        precondition(reopened.preferences.availablePrompts == prompts && reopened.preferences.prompt(for: .custom2) == custom)
         precondition(reopened.preferences.completedOnboarding && reopened.preferences.language == .chinese)
+
+        scenario.app.preferences.textMode = .custom1
+        scenario.app.hotkeys.onPress?(.record, 1)
+        try await waitFor("Fn plain dictation") { scenario.app.isRecording }
+        precondition(scenario.app.activeMode == .raw && !scenario.app.hudSnapshot.includesEditing,
+                     "Fn must ignore the selected processing prompt and work without a text service")
+        scenario.app.cancel()
+
+        var configuration = APIPreset.all.first { $0.id == "ollama" }!.configuration()
+        configuration.modelID = "isolated-no-network"
+        precondition(scenario.app.configurations.save(configuration))
+        let saved = scenario.app.configurations.configurations[0]
+        precondition(scenario.app.configurations.markTested(saved, result: TextResult(original: "样例", output: "结果", modelID: configuration.modelID)))
+        precondition(scenario.app.configurations.setCurrent(saved.id))
+        for (index, action) in [ShortcutAction.custom1, .custom2].enumerated() {
+            scenario.app.hotkeys.onPress?(action, Double(index + 2))
+            try await waitFor("custom shortcut recording") { scenario.app.isRecording }
+            precondition(scenario.app.activeMode == action.recordMode && scenario.app.hudSnapshot.mode == custom.name)
+            prompts[prompts.count - 1].name = "下次生效的名称"
+            precondition(scenario.app.savePromptLibrary(prompts))
+            precondition(scenario.app.setPrompt("digest", for: action.recordMode!))
+            precondition(scenario.app.hudSnapshot.mode == custom.name, "An active session must retain its prompt snapshot")
+            scenario.app.cancel()
+            precondition(scenario.app.setPrompt(custom.id, for: action.recordMode!))
+            prompts[prompts.count - 1] = custom
+            precondition(scenario.app.savePromptLibrary(prompts))
+        }
         try FileManager.default.removeItem(at: preferencesFile)
         try FileManager.default.createDirectory(at: preferencesFile, withIntermediateDirectories: true)
-        precondition(!scenario.app.saveTextPrompts(TextPrompts()), "A failed write must be reported")
-        precondition(scenario.app.preferences.textPrompts == prompts, "A failed save must keep the active prompts")
+        precondition(!scenario.app.savePromptLibrary(TextPrompt.defaults + [custom]), "A failed write must be reported")
+        precondition(!scenario.app.setPrompt("rewrite", for: .custom1))
+        precondition(scenario.app.preferences.availablePrompts == prompts && scenario.app.preferences.prompt(for: .custom1) == custom,
+                     "A failed save must keep the active library and binding")
     }
 
     static func waitFor(_ description: String, _ condition: () -> Bool) async throws {
@@ -242,7 +281,7 @@ enum ASRError: Error { case silence, isolatedFailure }
             if let priorDirectory { setenv("TESS_DATA_DIRECTORY", priorDirectory, 1) } else { unsetenv("TESS_DATA_DIRECTORY") }
             try? FileManager.default.removeItem(at: root)
         }
-        try checkPromptPreferences(root: root)
+        try await checkPromptPreferences(root: root)
 
         // Local notifications exercise production observer routing without sleeping the Mac.
         let interrupted = try Scenario(root: root)

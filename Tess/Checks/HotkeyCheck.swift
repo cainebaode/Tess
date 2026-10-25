@@ -2,7 +2,7 @@ import AppKit
 import Carbon
 
 // Only the unrelated text-mode value is supplied; the shortcut service is production code.
-enum TextMode { case raw, light, list, polish }
+enum TextMode { case raw, custom1, custom2 }
 
 @main @MainActor struct HotkeyCheck {
   struct Trigger: Equatable {
@@ -77,9 +77,9 @@ enum TextMode { case raw, light, list, polish }
     _ = monitor.process(.flagsChanged, event(56, [.maskSecondaryFn, .maskShift], at: 4.04))
     _ = monitor.process(.flagsChanged, event(56, .maskSecondaryFn, at: 4.06))
     _ = monitor.process(.flagsChanged, event(63, [], at: 4.1))
-    precondition(triggers == [.init(action: .recordLight, pressed: true), .init(action: .recordLight, pressed: false)])
+    precondition(triggers == [.init(action: .custom1, pressed: true), .init(action: .custom1, pressed: false)])
 
-    for action in [ShortcutAction.record, .recordLight, .recordList, .recordPolish] {
+    for action in ShortcutAction.voiceActions {
       triggers = []
       let binding = bindings[action]!
       var flags = CGEventFlags.maskSecondaryFn
@@ -164,7 +164,7 @@ enum TextMode { case raw, light, list, polish }
     precondition(triggers.isEmpty)
 
     // Binding only Shift+Fn does not claim bare Globe, even after a captured pair.
-    let shiftMonitor = FnKeyMonitor(bindings: [.recordLight: ShortcutAction.recordLight.defaults]) { _, _, _ in
+    let shiftMonitor = FnKeyMonitor(bindings: [.custom1: ShortcutAction.custom1.defaults]) { _, _, _ in
       preconditionFailure("Globe alone cannot trigger a shortcut")
     }
     precondition(shiftMonitor.process(.keyDown, event(179, .maskShift, at: 21, type: .keyDown)) == nil)
@@ -193,6 +193,6 @@ enum TextMode { case raw, light, list, polish }
     precondition(gesture.press(at: 2, phase: .loading, automatic: true, hold: true) == .cancel)
     precondition(gesture.press(at: 3, phase: .idle, automatic: true, hold: true) == .start)
     precondition(gesture.release(at: 4, phase: .recording, automatic: true, hold: true) == .stop)
-    print("Hotkey checks passed: reserved editing shortcuts, interrupted Fn, first press after a lost release, pending cancellation, four modes, Globe pair ordering, unbound/ordinary keys, repeat and interruption cleanup, and gesture recovery. Synthetic events only; no live keyboard, event tap, microphone or UI used.")
+    print("Hotkey checks passed: reserved editing shortcuts, interrupted Fn, first press after a lost release, pending cancellation, three voice shortcuts, Globe pair ordering, unbound/ordinary keys, repeat and interruption cleanup, and gesture recovery. Synthetic events only; no live keyboard, event tap, microphone or UI used.")
   }
 }

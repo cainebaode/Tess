@@ -10,7 +10,7 @@ struct APIConfigEditor: View {
     @State private var testResult: TextResult?
     @State private var sampleIndex = 0
     @State private var sampleText = TextService.samples[0]
-    @State private var testMode: TextMode = .light
+    @State private var testMode: TextMode = .custom1
     @State private var testTask: Task<Void, Never>?
     @State private var testing = false
 
@@ -21,7 +21,6 @@ struct APIConfigEditor: View {
                 Spacer()
                 Button(app.tr("关闭", "Close")) { dismiss() }.buttonStyle(SettingsButtonStyle())
             }.padding(20)
-            Divider().overlay(SettingsTheme.border)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     SettingsCard(title: app.tr("连接配置", "CONNECTION")) {
@@ -82,8 +81,8 @@ struct APIConfigEditor: View {
                             }
                         }.padding(.vertical, 8).disabled(testing)
                         Picker(app.tr("测试模式", "Test mode"), selection: $testMode) {
-                            ForEach([TextMode.light, .list, .polish]) { mode in
-                                Text(app.modeTitle(mode)).tag(mode)
+                            ForEach([TextMode.custom1, .custom2]) { mode in
+                                Text(app.tr(mode.title, mode.englishTitle) + " · " + app.modeTitle(mode)).tag(mode)
                             }
                         }.padding(.vertical, 8).disabled(testing)
                         Text(app.tr("使用已保存的提示词，可在下方修改测试文字。", "Uses your saved prompts. You can edit the sample text below."))
@@ -106,34 +105,31 @@ struct APIConfigEditor: View {
                     }
                 }.padding(22)
             }
-            Divider().overlay(SettingsTheme.border)
             VStack(alignment: .leading, spacing: 10) {
                 LocalStorageNotice(app: app)
                 if let error { Text(error).font(.caption).foregroundStyle(SettingsTheme.warning).fixedSize(horizontal: false, vertical: true) }
                 if !hasVerifiedConfiguration {
-                    Text(app.tr("启用整理前，请向下滚动完成样例测试；保存配置不会自动启用整理。", "Before enabling editing, scroll down and test a sample. Saving a configuration does not enable editing."))
+                    Text(app.tr("使用自定义快捷键前，请完成样例测试并设为当前服务。", "Before using custom shortcuts, test a sample and set this service as current."))
                         .font(.caption).foregroundStyle(SettingsTheme.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
                     Button(app.tr("保存", "Save")) { if save() != nil { dismiss() } }
                     Spacer()
-                    Button(app.tr("保存并设为当前", "Save & set current")) { useConfiguration(enableLightEditing: false) }
-                    if hasVerifiedConfiguration {
-                        Button(app.tr("使用并启用轻量整理", "Use & enable light editing")) { useConfiguration(enableLightEditing: true) }
-                            .buttonStyle(.borderedProminent).foregroundStyle(.white).controlSize(.regular)
-                    }
+                    Button(app.tr("保存并设为当前", "Save & set current")) { useConfiguration() }
                 }.disabled(testing).buttonStyle(SettingsButtonStyle())
             }.padding(18)
         }
         .frame(width: 680, height: 680)
-        .background(SettingsTheme.background).foregroundStyle(SettingsTheme.foreground)
+        .background(SettingsWindowBackdrop().ignoresSafeArea()).foregroundStyle(SettingsTheme.foreground)
         .tint(SettingsTheme.accent).preferredColorScheme(.light)
         .onDisappear { testTask?.cancel(); apiKey = "" }
         .onChange(of: connectionIdentity) { _, _ in if !testing { testResult = nil } }
         .onChange(of: sampleIndex) { _, index in sampleText = TextService.samples[index] }
         .onChange(of: sampleText) { _, _ in testResult = nil }
         .onChange(of: testMode) { _, _ in testResult = nil }
-        .onChange(of: app.preferences.textPrompts) { _, _ in testResult = nil }
+        .onChange(of: app.preferences.promptLibrary) { _, _ in testResult = nil }
+        .onChange(of: app.preferences.custom1PromptID) { _, _ in testResult = nil }
+        .onChange(of: app.preferences.custom2PromptID) { _, _ in testResult = nil }
     }
 
     private func field(_ title: String, value: Binding<String>) -> some View {
@@ -173,14 +169,14 @@ struct APIConfigEditor: View {
         guard !testing, let snapshot = save() else { return }
         let sample = sampleText
         let mode = testMode
-        let prompts = app.preferences.textPrompts ?? TextPrompts()
+        let prompt = app.preferences.prompt(for: mode)
         let key: String?
         do { key = try app.configurations.apiKey(for: snapshot) }
         catch { self.error = error.localizedDescription; return }
         testing = true
         testResult = nil
         testTask = Task { @MainActor in
-            let result = await app.textService.process(sample, mode: mode, configuration: snapshot, apiKey: key, prompts: prompts)
+            let result = await app.textService.process(sample, mode: mode, configuration: snapshot, apiKey: key, prompt: prompt)
             testing = false
             guard !Task.isCancelled else { return }
             testResult = result
@@ -207,14 +203,9 @@ struct APIConfigEditor: View {
             && configuration.allowsUnauthenticatedLocal == saved.allowsUnauthenticatedLocal
     }
 
-    private func useConfiguration(enableLightEditing: Bool) {
+    private func useConfiguration() {
         guard let snapshot = save() else { return }
-        guard !enableLightEditing || snapshot.testStatus == .passed else {
-            error = app.tr("配置有变更，请先重新测试。", "The configuration changed. Test it again first.")
-            return
-        }
         guard app.configurations.setCurrent(snapshot.id) else { error = app.configurations.lastError; return }
-        if enableLightEditing { app.preferences.textMode = .light }
         app.savePreferences()
         dismiss()
     }

@@ -4,23 +4,26 @@ import Carbon
 import Observation
 
 enum ShortcutAction: String, Codable, CaseIterable, Identifiable, Sendable {
-  case record, recordLight, recordList, recordPolish, screenshot, result
+  case record, custom1, custom2, screenshot, result
+  // Legacy keys are decoded for migration, never registered.
+  case recordLight, recordList, recordPolish
+  static let allCases: [ShortcutAction] = [.record, .custom1, .custom2, .screenshot, .result]
+  static let voiceActions: [ShortcutAction] = [.record, .custom1, .custom2]
   var id: String { rawValue }
   var recordMode: TextMode? {
     switch self {
     case .record: .raw
-    case .recordLight: .light
-    case .recordList: .list
-    case .recordPolish: .polish
-    case .screenshot, .result: nil
+    case .custom1: .custom1
+    case .custom2: .custom2
+    case .screenshot, .result, .recordLight, .recordList, .recordPolish: nil
     }
   }
   var defaults: ShortcutBinding {
     switch self {
     case .record: .fn
-    case .recordLight: ShortcutBinding(keyCode: 63, modifiers: UInt32(shiftKey))
+    case .custom1, .recordLight: ShortcutBinding(keyCode: 63, modifiers: UInt32(shiftKey))
     case .recordList: ShortcutBinding(keyCode: 63, modifiers: UInt32(controlKey))
-    case .recordPolish: ShortcutBinding(keyCode: 63, modifiers: UInt32(optionKey))
+    case .custom2, .recordPolish: ShortcutBinding(keyCode: 63, modifiers: UInt32(optionKey))
     case .screenshot, .result: ShortcutBinding(keyCode: self == .screenshot ? 1 : 15,
                                             modifiers: UInt32(controlKey | optionKey))
     }
@@ -145,6 +148,11 @@ struct ShortcutBinding: Codable, Equatable, Sendable {
 
   func set(_ action: ShortcutAction, binding: ShortcutBinding?) -> Bool {
     lastError = nil
+    guard ShortcutAction.allCases.contains(action) else { return false }
+    guard action != .record || binding == .fn else {
+      lastError = "基础语音输入固定使用 Fn。"
+      return false
+    }
     guard let binding else {
       if fnBindings.removeValue(forKey: action) != nil { rebuildFnMonitor() }
       if let ref = registrations.removeValue(forKey: action) { UnregisterEventHotKey(ref) }

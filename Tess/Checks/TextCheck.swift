@@ -1,5 +1,40 @@
 import Foundation
 @main struct TextCheck {
+  static func checkCustomPrompts() throws {
+    let prompt = TextPrompt(name: "摘要与翻译", instructions: "将材料总结成三条英文要点。")
+    let roundTrip = try JSONDecoder().decode(TextPrompt.self, from: JSONEncoder().encode(prompt))
+    precondition(roundTrip == prompt)
+    for protocolKind in APIProtocol.allCases {
+      var configuration = APIConfiguration()
+      configuration.protocolKind = protocolKind
+      configuration.baseURL = "https://example.com/v1"
+      let address = try APIAddress(baseURL: configuration.baseURL, protocolKind: protocolKind)
+      for mode in [TextMode.custom1, .custom2] {
+        let request = try TextService().makeRequest("完整的原始材料", mode: mode, configuration: configuration,
+                                                    address: address, key: "isolated-key", prompt: prompt)
+        let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+        let messages = body["messages"] as! [[String: String]]
+        precondition(messages.last?["content"] == "完整的原始材料")
+        let system = protocolKind == .anthropic ? body["system"] as? String : messages.first?["content"]
+        precondition(system == prompt.systemPrompt && system?.contains("不翻译") == false)
+        for invalid in [TextPrompt?.none, TextPrompt(name: "空内容", instructions: " \n")] {
+          do {
+            _ = try TextService().makeRequest("原文", mode: mode, configuration: configuration, address: address, key: "", prompt: invalid)
+            preconditionFailure("An unbound or empty prompt must fail before a request")
+          } catch let failure as TextServiceFailure { precondition(failure.category == .configuration) }
+        }
+        let source = String(repeating: "明天不要发布 API 3000 ms 的修改。", count: 10)
+        let summary = "- Keep the current API."
+        precondition(TextService.outputIssue(original: source, candidate: summary, mode: mode) == nil)
+        precondition(TextService.safetyWarnings(original: source, candidate: summary, mode: mode).isEmpty,
+                     "Prompt-directed summaries and translations must not be rejected by legacy editing heuristics")
+      }
+    }
+    let formatted: [String: Any] = ["choices": [["finish_reason": "stop", "message": ["role": "assistant", "content": "```text\n目标与步骤\n```"]]]]
+    let parsed = try TextService.parse(JSONSerialization.data(withJSONObject: formatted), protocolKind: .openAI, allowsFormatting: true)
+    precondition(parsed.text.hasPrefix("```text"))
+  }
+
   static func checkPrompts() throws {
     let defaults = TextPrompts()
     precondition(defaults.light == TextMode.light.rule)
@@ -128,6 +163,7 @@ import Foundation
 
   @MainActor static func main() async throws {
     try checkPrompts()
+    try checkCustomPrompts()
     try checkSparkSearchDisabled()
     try checkSparkResponses()
     let endpoint = try APIAddress(baseURL: "https://example.com/v1/", protocolKind: .openAI)
@@ -151,6 +187,9 @@ import Foundation
                                                    prompts: TextPrompts(common: "这条提示词不能触发请求", light: "", list: "", polish: ""))
     precondition(rawWithPrompts.output == "不要发布" && rawWithPrompts.error == nil && rawWithPrompts.modelID == nil,
                  "Original mode must bypass API configuration and custom prompts")
+    let rawWithCustomPrompt = await TextService().process("Fn 原文", mode: .raw, configuration: APIConfiguration(),
+                                                         prompt: TextPrompt(name: "加工", instructions: "翻译并扩写"))
+    precondition(rawWithCustomPrompt.output == "Fn 原文" && rawWithCustomPrompt.modelID == nil && rawWithCustomPrompt.error == nil)
     let scratch = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent(".build/verification/checks/config-\(UUID())", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: scratch) }
     let store = APIConfigurationStore(storageDirectory: scratch)

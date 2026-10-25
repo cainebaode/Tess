@@ -211,7 +211,7 @@ struct ResultView: View {
         Text(app.modeTitle(mode)).tag(mode)
           .disabled(mode != .raw && app.configurations.current?.testStatus != .passed)
       }
-    }.labelsHidden().frame(width: 140)
+    }.labelsHidden().frame(width: 180)
       .onChange(of: app.preferences.textMode) { _, _ in app.savePreferences() }
   }
 }

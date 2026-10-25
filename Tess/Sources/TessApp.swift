@@ -162,20 +162,16 @@ enum TessApplication {
       let entry = NSMenuItem(title: title, action: selector, keyEquivalent: "")
       entry.target = self; menu.addItem(entry)
     }
-    item(model.isRecording ? model.tr("停止录音", "Stop recording") : model.tr("开始录音", "Start recording"), #selector(toggleRecording))
+    item(model.isRecording ? model.tr("停止录音", "Stop recording") : model.tr("语音输入 · 原文", "Dictation · Original"), #selector(toggleRecording))
+    for (index, mode) in [TextMode.custom1, .custom2].enumerated() {
+      let title = model.tr("自定义 \(index + 1)", "Custom \(index + 1)") + " · " + model.modeTitle(mode)
+      let entry = NSMenuItem(title: title, action: #selector(recordWithPrompt(_:)), keyEquivalent: "")
+      entry.tag = index; entry.target = self; entry.isEnabled = !model.busy
+      menu.addItem(entry)
+    }
     item(model.tr("选区截图", "Capture selection"), #selector(screenshot))
     item(model.tr("最近结果", "Latest result"), #selector(openResult))
     item(model.tr("粘贴文字整理", "Edit pasted text"), #selector(manualText))
-    menu.addItem(.separator())
-    let modeMenu = NSMenu()
-    for (index, mode) in TextMode.allCases.enumerated() {
-      let entry = NSMenuItem(title: model.modeTitle(mode), action: #selector(changeMode(_:)), keyEquivalent: "")
-      entry.tag = index; entry.target = self; entry.state = model.preferences.textMode == mode ? .on : .off
-      entry.isEnabled = mode == .raw || model.configurations.current?.testStatus == .passed
-      modeMenu.addItem(entry)
-    }
-    let entry = NSMenuItem(title: model.tr("整理模式", "Text mode"), action: nil, keyEquivalent: "")
-    entry.submenu = modeMenu; menu.addItem(entry)
     menu.addItem(.separator())
     if !model.preferences.completedOnboarding { item(model.tr("继续设置 Tess…", "Continue setup…"), #selector(openResult)) }
     item(model.tr("设置…", "Settings…"), #selector(openSettings))
@@ -184,9 +180,7 @@ enum TessApplication {
     statusItem.button?.performClick(nil)
     statusItem.menu = nil
   }
-  @objc private func changeMode(_ sender: NSMenuItem) {
-    model.preferences.textMode = TextMode.allCases[sender.tag]; model.savePreferences()
-  }
+  @objc private func recordWithPrompt(_ sender: NSMenuItem) { model.startRecording(mode: sender.tag == 0 ? .custom1 : .custom2) }
   @objc private func toggleRecording() { model.isRecording ? model.stopRecording() : model.startRecording() }
   @objc private func screenshot() { model.takeScreenshot() }
   @objc private func manualText() { model.newText() }
@@ -289,6 +283,8 @@ enum TessApplication {
       view.sizingOptions = []
       settingsWindow?.contentView = view
       settingsWindow?.minSize = NSSize(width: 850, height: 660)
+      settingsWindow?.isOpaque = false
+      settingsWindow?.backgroundColor = .clear
     }
     settingsWindow?.makeKeyAndOrderFront(nil)
     NSApplication.shared.activate(ignoringOtherApps: true)

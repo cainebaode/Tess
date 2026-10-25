@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// A labeled group of related Settings rows on one rounded card
-/// (CONTEXT.md: related rows share rounded cards with subtle separators).
+/// A quiet paper surface for a group of related settings.
 struct SettingsCard<Content: View>: View {
   let title: String
   @ViewBuilder let content: Content
@@ -12,22 +11,29 @@ struct SettingsCard<Content: View>: View {
     VStack(alignment: .leading, spacing: 0) {
       Text(title)
         .font(.system(size: 11, weight: .semibold))
-        .tracking(0.6)
+        .tracking(0.3)
         .foregroundStyle(contrast == .increased ? SettingsTheme.secondary : SettingsTheme.muted)
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 6)
 
-      VStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 0) {
         content
       }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 8)
+      .padding(.horizontal, 18)
+      .padding(.bottom, 10)
     }
-    .background(SettingsTheme.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background {
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .fill(SettingsTheme.card.opacity(0.86))
+        .shadow(color: SettingsTheme.foreground.opacity(0.025), radius: 14, x: 0, y: 3)
+    }
     .overlay {
-      RoundedRectangle(cornerRadius: 16, style: .continuous)
-        .stroke(contrast == .increased ? SettingsTheme.foreground.opacity(0.28) : SettingsTheme.border, lineWidth: 1)
+      if contrast == .increased {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+          .strokeBorder(SettingsTheme.foreground.opacity(0.28), lineWidth: 1)
+      }
     }
   }
 }

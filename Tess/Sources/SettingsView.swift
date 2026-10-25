@@ -7,7 +7,7 @@ struct SettingsView: View {
     var app: AppModel
     private var section: SettingsSection { app.settingsSection }
     @State private var editingConfiguration: APIConfiguration?
-    @State private var editingPrompts = false
+    @State private var editingPrompt: TextPrompt?
     @State private var deleteConfiguration: APIConfiguration?
     @State private var modelError: String?
     @State private var shortcutError: String?
@@ -19,38 +19,31 @@ struct SettingsView: View {
                 TessWordmark(size: 27)
                 Text("苔丝").font(.system(size: 12, weight: .medium)).foregroundStyle(SettingsTheme.secondary)
                 Spacer()
-                Text(app.tr("设置", "Settings")).foregroundStyle(SettingsTheme.secondary)
+                Text(app.tr("设置", "Settings")).font(.system(size: 12)).foregroundStyle(SettingsTheme.secondary)
             }
-            .padding(.horizontal, 24).frame(height: 56)
-            Divider().overlay(SettingsTheme.border)
+            .padding(.horizontal, 24).frame(height: 52)
             HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 5) {
                     ForEach(SettingsSection.allCases) { value in
                         Button { app.settingsSection = value } label: {
-                            Label(app.tr(value.zh, value.en), systemImage: value.icon)
+                            HStack(spacing: 10) {
+                                Image(systemName: value.icon).font(.system(size: 14, weight: .regular))
+                                    .frame(width: 20)
+                                Text(app.tr(value.zh, value.en))
+                            }
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(section == value ? SettingsTheme.foreground : SettingsTheme.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12).padding(.vertical, 10)
-                                .background(section == value ? SettingsTheme.leaf.opacity(0.28) : .clear,
-                                            in: RoundedRectangle(cornerRadius: 9))
-                                .overlay(alignment: .leading) {
-                                    if section == value {
-                                        Capsule().fill(SettingsTheme.accent).frame(width: 2).padding(.vertical, 8)
-                                    }
-                                }
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(SettingsNavigationStyle(isSelected: section == value))
                             .accessibilityValue(section == value ? app.tr("已选中", "Selected") : "")
                     }
                     Spacer()
-                    Text("Tess \(appVersion)").font(.caption).foregroundStyle(SettingsTheme.secondary).padding(12)
+                    Text("Tess \(appVersion)").font(.system(size: 11)).foregroundStyle(SettingsTheme.muted).padding(12)
                 }
-                .padding(12).frame(width: 190).frame(maxHeight: .infinity)
-                .background(SettingsTheme.sidebar)
-                Divider().overlay(SettingsTheme.border)
+                .padding(12).frame(width: 196).frame(maxHeight: .infinity)
+                .background(SettingsSidebarBackdrop())
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
-                        Text(app.tr(section.zh, section.en)).font(.system(size: 23, weight: .semibold))
+                        Text(app.tr(section.zh, section.en)).font(.system(size: 22, weight: .semibold))
                         LocalStorageNotice(app: app)
                         switch section {
                         case .general: general
@@ -59,19 +52,19 @@ struct SettingsView: View {
                         case .privacy: privacy
                         case .about: about
                         }
-                    }.padding(26).frame(maxWidth: .infinity, alignment: .leading)
+                    }.padding(28).frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
         .frame(minWidth: 830, minHeight: 610)
-        .background(SettingsTheme.background)
+        .background(SettingsWindowBackdrop().ignoresSafeArea())
         .foregroundStyle(SettingsTheme.foreground)
         .tint(SettingsTheme.accent).preferredColorScheme(.light)
         .sheet(item: $editingConfiguration) { configuration in
             APIConfigEditor(app: app, configuration: configuration)
         }
-        .sheet(isPresented: $editingPrompts) {
-            TextPromptEditor(app: app, prompts: app.preferences.textPrompts ?? TextPrompts())
+        .sheet(item: $editingPrompt) { prompt in
+            TextPromptEditor(app: app, prompts: app.preferences.availablePrompts, selectedID: prompt.id)
         }
         .alert(app.tr("删除文字配置？", "Delete this configuration?"), isPresented: Binding(
             get: { deleteConfiguration != nil }, set: { if !$0 { deleteConfiguration = nil } }
@@ -89,8 +82,95 @@ struct SettingsView: View {
         }
     }
 
+    private var voiceShortcuts: some View {
+        SettingsCard(title: app.tr("语音快捷键", "VOICE SHORTCUTS")) {
+            HStack(spacing: 14) {
+                Text(app.tr("输入方式", "Input")).frame(width: 100, alignment: .leading)
+                Text(app.tr("处理方式", "Processing")).frame(maxWidth: .infinity, alignment: .leading)
+                Text(app.tr("快捷键", "Shortcut")).frame(width: 142, alignment: .leading)
+            }
+            .font(.caption).foregroundStyle(SettingsTheme.muted).padding(.top, 12).padding(.bottom, 4)
+            HStack(spacing: 14) {
+                Text(app.tr("语音输入", "Dictation")).frame(width: 100, alignment: .leading)
+                Text(app.tr("原文 · 不加工", "Original transcript")).foregroundStyle(SettingsTheme.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    Text("Fn").font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .frame(width: 114, height: 31)
+                        .background(SettingsTheme.sidebar, in: RoundedRectangle(cornerRadius: 8))
+                    Color.clear.frame(width: 20, height: 1)
+                }
+            }.font(.system(size: 13, weight: .medium)).padding(.vertical, 12)
+            Rectangle().fill(SettingsTheme.border).frame(height: 0.5)
+            ForEach([ShortcutAction.custom1, .custom2]) { action in
+                if let mode = action.recordMode {
+                    HStack(spacing: 14) {
+                        Text(app.tr(mode.title, mode.englishTitle))
+                            .font(.system(size: 13, weight: .medium)).frame(width: 100, alignment: .leading)
+                        HStack(spacing: 6) {
+                            Picker(app.tr("绑定提示词", "Prompt"), selection: Binding(
+                                get: { app.preferences.prompt(for: mode)?.id ?? "" },
+                                set: { if !app.setPrompt($0, for: mode) { shortcutError = app.storageNotice } }
+                            )) {
+                                ForEach(app.preferences.availablePrompts) { prompt in
+                                    Text(prompt.title(chinese: app.preferences.language.usesChinese)).tag(prompt.id)
+                                }
+                            }.labelsHidden().frame(maxWidth: 220, alignment: .leading)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .accessibilityLabel(shortcutTitle(action) + app.tr("的提示词", " prompt"))
+                            Button { editingPrompt = app.preferences.prompt(for: mode) } label: {
+                                Image(systemName: "square.and.pencil").frame(width: 24, height: 28)
+                            }.buttonStyle(.borderless)
+                                .help(app.tr("查看与编辑提示词", "View and edit prompt"))
+                                .accessibilityLabel(app.tr("编辑提示词：", "Edit prompt: ") + app.modeTitle(mode))
+                            Spacer(minLength: 0)
+                        }.frame(maxWidth: .infinity, alignment: .leading).disabled(app.busy)
+                        shortcutControls(action)
+                    }.padding(.vertical, 12)
+                    Rectangle().fill(SettingsTheme.border).frame(height: 0.5)
+                }
+            }
+            HStack {
+                Button(app.tr("提示词库…", "Prompt library…")) { editingPrompt = app.preferences.availablePrompts.first }
+                    .buttonStyle(.bordered).controlSize(.small)
+                Spacer()
+                Button {
+                    app.settingsSection = .text
+                } label: {
+                    Label(app.configurations.current?.name ?? app.tr("配置文字服务", "Set up text service"),
+                          systemImage: app.configurations.current?.testStatus == .passed ? "checkmark.circle" : "arrow.up.right")
+                        .font(.caption)
+                }.buttonStyle(.borderless)
+            }.padding(.top, 12).padding(.bottom, 6)
+            Text(app.tr("选择提示词决定加工方式；点击键位修改快捷键，Esc 取消。", "Choose a prompt to set the processing style. Click a shortcut to change it; Esc cancels."))
+                .font(.caption).foregroundStyle(SettingsTheme.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.bottom, 8)
+            if !app.hotkeys.fnEnabled {
+                SettingsRow(title: app.tr("启用 Fn 语音输入", "Enable Fn dictation"),
+                            description: app.tr("允许辅助功能权限后，返回此窗口即可启用。", "Allow Accessibility access, then return here.")) {
+                    Button(app.tr("允许权限", "Allow access")) {
+                        app.delivery.requestAccessibilityPermission()
+                        app.hotkeys.refreshFn()
+                    }.buttonStyle(.bordered)
+                }
+            }
+            DisclosureGroup(app.tr("Fn 使用帮助", "Fn key help")) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(app.tr("若 Fn 弹出表情、切换输入法或打开系统听写，请把系统的 Fn 单独按键动作设为“不执行操作”。", "If Fn opens emoji, switches input sources or starts system dictation, set its standalone action to Do Nothing in Keyboard settings."))
+                        .font(.caption).foregroundStyle(SettingsTheme.secondary)
+                    Spacer(minLength: 0)
+                    Button(app.tr("键盘设置", "Keyboard settings")) {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") { NSWorkspace.shared.open(url) }
+                    }.buttonStyle(.borderless).fixedSize()
+                }.padding(.vertical, 8)
+            }.font(.caption).foregroundStyle(SettingsTheme.secondary).padding(.bottom, 8)
+            if let error = shortcutError ?? app.hotkeys.lastError { notice(error, isError: true) }
+        }
+    }
+
     private var general: some View {
         VStack(spacing: 18) {
+            voiceShortcuts
             SettingsCard(title: app.tr("输入准备", "READY TO USE")) {
                 SettingsRow(title: app.tr("语音模型", "Speech model"),
                             description: app.asr.isReady(app.asr.selectedModel)
@@ -123,67 +203,15 @@ struct SettingsView: View {
                         Text(app.tr("按键切换", "Press to toggle")).tag(false)
                     }.frame(width: 155).disabled(app.busy)
                 }
-                SettingsRow(title: app.tr("默认整理模式", "Default text mode"),
-                            description: app.tr("用于菜单录音、截图说明和手动整理；语音快捷键直接决定本次模式。", "Used for menu recording, screenshot notes and pasted text. Each voice shortcut selects its own mode.")) {
-                    Picker("", selection: Binding(get: { app.preferences.textMode }, set: { mode in
-                        guard mode == .raw || app.configurations.current?.testStatus == .passed else { return }
-                        app.preferences.textMode = mode
-                        app.savePreferences()
-                    })) {
-                        ForEach(TextMode.allCases, id: \.self) { mode in
-                            Text(modeTitle(mode)).tag(mode).disabled(mode != .raw && app.configurations.current?.testStatus != .passed)
-                        }
-                    }.frame(width: 155)
-                }
                 SettingsRow(title: app.tr("所有结果先预览", "Always preview results"),
                             description: app.tr("关闭后，语音直接输入原位置；目标变化或无法识别时自动复制。", "Otherwise, dictation goes into the original field, or is copied if the target changes or cannot be identified.")) {
                     Toggle("", isOn: preference(\.alwaysPreview)).labelsHidden().toggleStyle(.switch)
                 }
             }
-            SettingsCard(title: app.tr("快捷键", "SHORTCUTS")) {
-                ForEach(ShortcutAction.allCases) { action in
-                    SettingsRow(title: shortcutTitle(action)) {
-                        HStack(spacing: 8) {
-                            ShortcutRecorder(label: app.preferences.bindings[action]?.label ?? app.tr("未绑定", "Unbound"),
-                                             prompt: action.recordMode != nil ? app.tr("Fn 或组合键 · Esc 取消", "Fn or shortcut · Esc cancels") : app.tr("按组合键 · Esc 取消", "Press shortcut · Esc cancels"),
-                                             accessibilityTitle: shortcutTitle(action),
-                                             isEnabled: !app.busy,
-                                             allowsFn: action.recordMode != nil,
-                                             onStart: { app.hotkeys.suspend() },
-                                             onFinish: { app.hotkeys.register(app.preferences.bindings) },
-                                             onBinding: {
-                                                 shortcutError = app.setShortcut(action, binding: $0) ? nil : app.hotkeys.lastError
-                                             })
-                                .frame(width: 160, height: 31).allowsHitTesting(!app.busy)
-                            Button(app.tr("清除", "Clear")) {
-                                shortcutError = app.setShortcut(action, binding: nil) ? nil : app.hotkeys.lastError
-                            }
-                                .buttonStyle(SettingsButtonStyle())
-                            Button(app.tr("默认", "Default")) {
-                                shortcutError = app.setShortcut(action, binding: action.defaults) ? nil : app.hotkeys.lastError
-                            }
-                                .buttonStyle(SettingsButtonStyle())
-                        }.disabled(app.busy)
-                    }
+            SettingsCard(title: app.tr("其他快捷键", "OTHER SHORTCUTS")) {
+                ForEach([ShortcutAction.screenshot, .result]) { action in
+                    SettingsRow(title: shortcutTitle(action)) { shortcutControls(action) }
                 }
-                if app.preferences.bindings.values.contains(where: \.isFn) {
-                    SettingsRow(title: app.tr("Fn 按键", "Fn key"), description: app.hotkeys.fnEnabled
-                                ? app.tr("已启用。若弹出表情、切换输入法或系统听写，请在键盘设置里将 Fn 单独按键动作设为“不执行操作”。", "Enabled. If Fn opens emoji, switches input sources or invokes system dictation, set its standalone action to Do Nothing in Keyboard settings.")
-                                : app.tr("需允许 Tess 的辅助功能权限。授权后返回此窗口即可启用，也可录入组合键。", "Allow Tess in Accessibility, then return here to enable Fn. A key combination is also available.")) {
-                        if !app.hotkeys.fnEnabled {
-                            Button(app.tr("启用 Fn", "Enable Fn")) {
-                                app.delivery.requestAccessibilityPermission()
-                                app.hotkeys.refreshFn()
-                            }.buttonStyle(SettingsButtonStyle())
-                        }
-                        Button(app.tr("键盘设置", "Keyboard settings")) {
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") { NSWorkspace.shared.open(url) }
-                        }.buttonStyle(SettingsButtonStyle())
-                    }
-                }
-                if let error = shortcutError ?? app.hotkeys.lastError { notice(error, isError: true) }
-                notice(app.tr("每种语音模式都有独立快捷键，点击键位即可修改。Fn 组合建议先按修饰键再按 Fn；松开 Fn 结束，也可轻点保持录音、再点结束。Esc 取消当前操作或退出键位录入。",
-                              "Each voice mode has its own shortcut. Click a binding to change it. For Fn combinations, press the modifier first, then Fn. Release Fn to finish, or tap to keep recording and tap again to finish. Esc cancels the operation or binding capture."))
                 Button(app.tr("打开最近结果 / 粘贴文字", "Open recent result / paste text")) { app.showResult() }
                     .buttonStyle(SettingsButtonStyle()).padding(.vertical, 10)
             }
@@ -293,7 +321,7 @@ struct SettingsView: View {
                 .font(.caption).foregroundStyle(SettingsTheme.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-        }.padding(.vertical, 13).overlay(alignment: .bottom) { Divider().overlay(SettingsTheme.foreground.opacity(0.08)) }
+        }.padding(.vertical, 13).overlay(alignment: .bottom) { Rectangle().fill(SettingsTheme.border).frame(height: 0.5) }
     }
 
     private var textConfigurations: some View {
@@ -329,7 +357,7 @@ struct SettingsView: View {
                                 .accessibilityLabel(app.tr("删除配置：", "Delete configuration: ") + value.name)
                         }
                         if let message = value.testMessage { Text(message).font(.caption).foregroundStyle(SettingsTheme.secondary) }
-                    }.padding(.vertical, 13).overlay(alignment: .bottom) { Divider().overlay(SettingsTheme.foreground.opacity(0.08)) }
+                    }.padding(.vertical, 13).overlay(alignment: .bottom) { Rectangle().fill(SettingsTheme.border).frame(height: 0.5) }
                 }
                 HStack {
                     Button(app.tr("添加配置", "Add configuration")) { editingConfiguration = APIPreset.all[0].configuration() }
@@ -348,18 +376,13 @@ struct SettingsView: View {
                     }
                 }
             }
-            SettingsCard(title: app.tr("整理提示词", "EDITING PROMPTS")) {
-                notice(app.tr("所有文字服务共用一套提示词：通用要求加上当前模式的规则。可分别调整轻量整理、列表整理和自然润色；原文模式不调用文字服务。",
-                              "All text services share these prompts: common instructions plus the selected mode's rules. Customize light cleanup, lists and polish separately. Original mode does not call a text service."))
-                HStack {
-                    Text(app.preferences.textPrompts == nil || app.preferences.textPrompts == TextPrompts()
-                         ? app.tr("使用默认提示词", "Using default prompts") : app.tr("使用自定义提示词", "Using custom prompts"))
-                        .font(.caption).foregroundStyle(SettingsTheme.secondary)
-                    Spacer()
-                    Button(app.tr("编辑提示词", "Edit prompts")) { editingPrompts = true }
-                        .buttonStyle(SettingsButtonStyle())
-                }.padding(.vertical, 10)
-                notice(app.tr("数字、术语等内容发生可疑变化或服务失败时，仍会保留原文供你核对。", "Suspicious changes to numbers or terminology, and service failures, still preserve the original for review."))
+            SettingsCard(title: app.tr("提示词库", "PROMPT LIBRARY")) {
+                SettingsRow(title: app.tr("选择适合你的处理方式", "Choose how to process text"),
+                            description: app.tr("轻量整理、AI 指令、英文翻译等模板，均可编辑。", "Editable templates for cleanup, agent requests, English translation and more.")) {
+                    Button(app.tr("管理提示词…", "Manage prompts…")) { editingPrompt = app.preferences.availablePrompts.first }
+                        .buttonStyle(.bordered)
+                }
+                notice(app.tr("在「通用与快捷键」绑定提示词。原文始终保留，文字服务失败时使用原文。", "Bind prompts in General & shortcuts. The original is retained and used if the text service fails."))
             }
         }
     }
@@ -423,7 +446,7 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.vertical, 18)
-            Divider().overlay(SettingsTheme.foreground.opacity(0.08))
+            Rectangle().fill(SettingsTheme.border).frame(height: 0.5)
             SettingsRow(title: app.tr("使用帮助与更新", "Help & updates"), description: app.tr("查看快捷键、权限排查、隐私说明和安装更新方法。", "Shortcuts, permissions, privacy and installing updates.")) {
                 Button(app.tr("打开帮助", "Open help")) {
                     if let url = Bundle.main.url(forResource: "Help", withExtension: "html") { NSWorkspace.shared.open(url) }
@@ -443,7 +466,7 @@ struct SettingsView: View {
         Binding(get: { app.preferences[keyPath: keyPath] }, set: { app.preferences[keyPath: keyPath] = $0; app.savePreferences() })
     }
     private func notice(_ text: String, isError: Bool = false) -> some View {
-        Text(text).font(.caption).foregroundStyle(isError ? SettingsTheme.warning : SettingsTheme.secondary)
+        Text(text).font(.caption).lineSpacing(3).foregroundStyle(isError ? SettingsTheme.warning : SettingsTheme.secondary)
             .frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true).padding(.vertical, 9)
     }
     private func bytes(_ count: Int64) -> String { ByteCountFormatter.string(fromByteCount: count, countStyle: .file) }
@@ -459,6 +482,8 @@ struct SettingsView: View {
     private func shortcutTitle(_ action: ShortcutAction) -> String {
         switch action {
         case .record: app.tr("语音输入 · 原文", "Voice input · Original")
+        case .custom1: app.tr("自定义快捷键 1", "Custom shortcut 1")
+        case .custom2: app.tr("自定义快捷键 2", "Custom shortcut 2")
         case .recordLight: app.tr("语音输入 · 轻量整理", "Voice input · Light cleanup")
         case .recordList: app.tr("语音输入 · 列表整理", "Voice input · List")
         case .recordPolish: app.tr("语音输入 · 自然润色", "Voice input · Polish")
@@ -466,13 +491,27 @@ struct SettingsView: View {
         case .result: app.tr("最近结果", "Recent result")
         }
     }
-    private func modeTitle(_ mode: TextMode) -> String {
-        switch mode {
-        case .raw: app.tr("原文", "Original")
-        case .light: app.tr("轻量整理", "Light edit")
-        case .list: app.tr("列表整理", "List")
-        case .polish: app.tr("自然润色", "Polish")
-        }
+    private func shortcutControls(_ action: ShortcutAction) -> some View {
+        HStack(spacing: 8) {
+            ShortcutRecorder(label: app.preferences.bindings[action]?.label ?? app.tr("未绑定", "Unbound"),
+                             prompt: app.tr("按键 · Esc 取消", "Keys · Esc cancels"),
+                             accessibilityTitle: shortcutTitle(action), isEnabled: !app.busy, allowsFn: action.recordMode != nil,
+                             onStart: { app.hotkeys.suspend() }, onFinish: { app.hotkeys.register(app.preferences.bindings) },
+                             onBinding: { shortcutError = app.setShortcut(action, binding: $0) ? nil : app.hotkeys.lastError })
+                .frame(width: 114, height: 31).allowsHitTesting(!app.busy)
+            Menu {
+                Button(app.tr("恢复默认快捷键", "Restore default shortcut")) {
+                    shortcutError = app.setShortcut(action, binding: action.defaults) ? nil : app.hotkeys.lastError
+                }.disabled(app.preferences.bindings[action] == action.defaults)
+                Button(app.tr("清除快捷键", "Clear shortcut")) {
+                    shortcutError = app.setShortcut(action, binding: nil) ? nil : app.hotkeys.lastError
+                }.disabled(app.preferences.bindings[action] == nil)
+            } label: {
+                Image(systemName: "ellipsis").frame(width: 20, height: 28)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .help(app.tr("快捷键选项", "Shortcut options"))
+                .accessibilityLabel(shortcutTitle(action) + app.tr("选项", " options"))
+        }.disabled(app.busy)
     }
     private func testStatus(_ configuration: APIConfiguration) -> String {
         switch configuration.testStatus {

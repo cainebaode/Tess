@@ -17,6 +17,7 @@ struct SettingsRow<Control: View>: View {
         if !description.isEmpty {
           Text(description)
             .font(.caption)
+            .lineSpacing(2)
             .foregroundStyle(contrast == .increased ? SettingsTheme.foreground : SettingsTheme.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -27,8 +28,8 @@ struct SettingsRow<Control: View>: View {
     .padding(.vertical, 13)
     .overlay(alignment: .bottom) {
       Rectangle()
-        .fill(SettingsTheme.foreground.opacity(contrast == .increased ? 0.24 : 0.08))
-        .frame(height: 1)
+        .fill(SettingsTheme.foreground.opacity(contrast == .increased ? 0.24 : 0.07))
+        .frame(height: contrast == .increased ? 1 : 0.5)
     }
   }
 }

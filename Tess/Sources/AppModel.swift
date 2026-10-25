@@ -119,7 +119,7 @@ enum SessionPhase: Equatable {
       detail = status
     }
     return HUDSnapshot(phase: state, title: title, subtitle: detail,
-                       mode: captureFailure == nil ? modeTitle(snapshot?.textMode ?? preferences.textMode) : "",
+                       mode: captureFailure == nil ? modeTitle(snapshot?.textMode ?? .raw, settings: snapshot) : "",
                        elapsed: recorder.elapsed, levels: recorder.levelHistory, isSilent: recorder.isQuiet,
                        canRetry: state == .failed, isEnglish: !preferences.language.usesChinese,
                        includesEditing: (snapshot?.textMode ?? preferences.textMode) != .raw,
@@ -171,10 +171,11 @@ enum SessionPhase: Equatable {
     hotkeys.onPress = { [weak self] action, time in
       guard let self else { return }
       switch action {
-      case .record, .recordLight, .recordList, .recordPolish:
+      case .record, .custom1, .custom2:
         self.handleRecordKey(action, pressed: true, at: time)
       case .screenshot: self.takeScreenshot()
       case .result: self.showResult()
+      case .recordLight, .recordList, .recordPolish: break
       }
     }
     hotkeys.onRelease = { [weak self] action, time in
@@ -214,13 +215,9 @@ enum SessionPhase: Equatable {
   }
 
   func tr(_ chinese: String, _ english: String) -> String { preferences.language.usesChinese ? chinese : english }
-  func modeTitle(_ mode: TextMode) -> String {
-    switch mode {
-    case .raw: tr("原文", "Original")
-    case .light: tr("轻量整理", "Light cleanup")
-    case .list: tr("列表整理", "Bullet list")
-    case .polish: tr("自然润色", "Polish")
-    }
+  func modeTitle(_ mode: TextMode, settings: AppPreferences? = nil) -> String {
+    (settings ?? preferences).prompt(for: mode)?.title(chinese: preferences.language.usesChinese)
+      ?? tr(mode.title, mode.englishTitle)
   }
   func savePreferences() {
     if configurations.current?.testStatus != .passed { preferences.textMode = .raw }
@@ -228,14 +225,30 @@ enum SessionPhase: Equatable {
     preferences.microphoneID = recorder.selectedDeviceID
     persist(preferences, name: "preferences.json")
   }
-  @discardableResult func saveTextPrompts(_ prompts: TextPrompts) -> Bool {
+  @discardableResult func savePromptLibrary(_ prompts: [TextPrompt]) -> Bool {
+    guard !prompts.isEmpty, prompts.allSatisfy(\.isValid), Set(prompts.map(\.id)).count == prompts.count,
+          [TextMode.custom1, .custom2].allSatisfy({ mode in
+            preferences.prompt(for: mode).map { bound in prompts.contains { $0.id == bound.id } } == true
+          }) else { return false }
     var next = preferences
-    next.textPrompts = prompts
+    next.promptLibrary = prompts
+    guard persist(next, name: "preferences.json") else { return false }
+    preferences = next
+    return true
+  }
+  @discardableResult func setPrompt(_ id: String, for mode: TextMode) -> Bool {
+    guard mode.isCustom, preferences.availablePrompts.contains(where: { $0.id == id && $0.isValid }) else { return false }
+    var next = preferences
+    if mode == .custom1 { next.custom1PromptID = id } else { next.custom2PromptID = id }
     guard persist(next, name: "preferences.json") else { return false }
     preferences = next
     return true
   }
   func setShortcut(_ action: ShortcutAction, binding: ShortcutBinding?) -> Bool {
+    guard action != .record || binding == .fn else {
+      hotkeys.lastError = tr("基础语音输入固定使用 Fn。", "Basic dictation always uses Fn.")
+      return false
+    }
     if let binding, preferences.bindings.contains(where: { $0.key != action && $0.value == binding }) {
       hotkeys.lastError = tr("与 Tess 的其他快捷键重复。", "This shortcut is already used by Tess.")
       return false
@@ -282,7 +295,12 @@ enum SessionPhase: Equatable {
     let practicing = !preferences.completedOnboarding && preferences.onboardingStep == 3
     statusHUDTask?.cancel()
     captureFailure = nil
-    let selectedMode = practicing ? TextMode.raw : (mode ?? preferences.textMode)
+    let selectedMode = practicing ? TextMode.raw : (mode ?? .raw)
+    guard !selectedMode.isCustom || preferences.prompt(for: selectedMode)?.isValid == true else {
+      status = tr("请先为这个自定义快捷键选择提示词。", "Choose a prompt for this custom shortcut first.")
+      showSettings(.general)
+      return
+    }
     guard selectedMode == .raw || configurations.current?.testStatus == .passed else {
       status = tr("请先配置并测试文字服务，再使用整理快捷键。", "Configure and test a text service before using an editing shortcut.")
       hideHUD?()
@@ -500,9 +518,9 @@ enum SessionPhase: Equatable {
     let mode = current.mode
     if mode != .raw {
       phase = .processing
-      status = tr("正在整理…", "Cleaning up…")
+      status = tr("正在处理文字…", "Processing text…")
       let processed = await textService.process(current.original, mode: mode, configuration: snapshotConfig, apiKey: snapshotKey,
-                                               prompts: snapshot?.textPrompts ?? TextPrompts())
+                                               prompts: snapshot?.textPrompts ?? TextPrompts(), prompt: snapshot?.prompt(for: mode))
       guard sessionID == id, !Task.isCancelled, !processed.isCancelled else { return }
       draft?.output = processed.output
       draft?.candidate = processed.candidate

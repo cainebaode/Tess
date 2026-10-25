@@ -167,7 +167,7 @@ struct OnboardingView: View {
           NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
         }
       }.buttonStyle(SettingsButtonStyle())
-      Text(app.tr("若 Fn 同时弹出表情或系统听写，在键盘设置中将其动作改为“不执行操作”，或选择其他快捷键。", "If Fn opens emoji or system dictation, set its action to Do Nothing in Keyboard settings, or choose another shortcut."))
+      Text(app.tr("若 Fn 同时弹出表情或系统听写，在键盘设置中将其动作改为“不执行操作”。自定义组合键可在设置中配置。", "If Fn opens emoji or system dictation, set its action to Do Nothing in Keyboard settings. Custom shortcuts can be configured in Settings."))
         .font(.caption).foregroundStyle(SettingsTheme.secondary)
       if !ready {
         Button(app.tr("权限或模型未就绪，返回检查", "Permissions or model need attention")) { move(to: 1) }.buttonStyle(SettingsButtonStyle())

@@ -1,6 +1,6 @@
 # Tess 项目架构与目录地图
 
-核对日期：2026-10-24。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮保留根目录名称，已按功能迁移文档与本机产物，GitHub 仓库于 2026-10-25 统一为公开的 `cainebaode/Tess`，源码与 Releases 一起维护。
+核对日期：2026-10-25。根目录 `/Users/caine/Documents/Project/Faster` 沿用早期 Faster 项目名，当前产品名为 Tess；本轮保留根目录名称，已按功能迁移文档与本机产物，GitHub 仓库于 2026-10-25 统一为公开的 `cainebaode/Tess`，源码与 Releases 一起维护。
 
 ## 当前项目是什么
 
@@ -45,7 +45,7 @@ flowchart TD
 | 快捷键 | `HotkeyService.swift` | Fn 与组合键、按下／释放、取消及会话中断后的恢复 |
 | 录音 | `AudioRecorder.swift`、`AudioLevelMeter.swift` | 麦克风、音频缓冲、时长和音量 |
 | 本地识别 | `ASRService.swift` | Qwen／Whisper 的模型管理、准备、中间与最终识别 |
-| 文字整理 | `TextService.swift`、`APIConfiguration.swift`、`TextPromptEditor.swift` | 原文／轻量整理／列表／润色，外部 API 配置、密钥引用及共用提示词编辑 |
+| 文字整理 | `TextService.swift`、`APIConfiguration.swift`、`TextPromptEditor.swift` | Fn 原文及两个提示词绑定入口，外部 API 配置、密钥引用及提示词库 |
 | 外部输入 | `DeliveryService.swift` | 识别输入目标、粘贴、剪贴板回退及微信／ChatGPT 窗口兼容保护 |
 | 原位截图 | `CaptureService.swift`、`ScreenshotSelection.swift`、`ScreenshotEditorView.swift` | ScreenCaptureKit 快照、选区坐标、调暗层、标注、图片存储及复制 |
 | 本地存储 | `LocalStore.swift` | 设置与结果文件、写入恢复及损坏文件的恢复副本 |
@@ -71,15 +71,23 @@ flowchart TD
 - `Captures/`：选区图片暂存；`Recovery/`：存储恢复副本。
 - `Diagnostics/input.json`：最近 100 条自动输入状态，包含应用标识、build、系统错误码及有限角色信息，不包含录音、转写、输入框正文或剪贴板内容。
 
-应用安装路径为 `/Applications/Tess.app`。2026-10-25 曾按用户要求卸载，之后重新安装 build 25，再依次更新为 build 26、build 27、build 28。当前为 build 28。项目候选、归档、正式 DMG 和用户数据是不同位置，更新安装不等于重置用户数据。
+应用安装路径为 `/Applications/Tess.app`。2026-10-25 曾按用户要求卸载，之后重新安装 build 25，再依次更新至 build 36。当前界面见 [磨砂材质与界面优化](releases/20261025-09-tess-frosted-settings-ui.md)，八个默认提示词见 [提示词模板记录](releases/20261025-08-tess-settings-and-prompt-templates.md)。项目候选、归档、正式 DMG 和用户数据是不同位置，更新安装不等于重置用户数据。
 
 ## 本机产物与回退
 
-**2026-10-25 后续变更：** 用户要求全部卸载重装时，下表中的 `.app` 副本曾被移除，运行数据曾移出原目录；原位置与过程保存在本机 `evidence/20261025-tess-uninstall/removed-applications.json`，详见 [卸载记录](releases/20261025-03-tess-local-uninstall.md)。之后本机重新安装 build 25。文字服务迭代后安装 build 26，当前针对 ChatGPT 缺失焦点输入框已安装 build 28，build 27 作为紧邻回退保留，见 [原窗口输入迭代](releases/20261025-06-tess-chatgpt-window-input.md)；其余历史条目仍只说明原产物位置。
+**2026-10-25 后续变更：** 用户要求全部卸载重装时，下表中的 `.app` 副本曾被移除，运行数据曾移出原目录；原位置与过程保存在本机 `evidence/20261025-tess-uninstall/removed-applications.json`，详见 [卸载记录](releases/20261025-03-tess-local-uninstall.md)。之后本机重新安装 build 25。文字服务和原窗口输入迭代后安装 build 28，用户已确认 ChatGPT Fn 自动输入正常；三个语音入口与提示词库在 build 30 收敛，设置布局与模板优化后安装至 build 32，界面优化后安装至 build 34，增强玻璃可见度后安装至 build 35，再按用户反馈柔化边缘并统一材质至 build 36；build 35、build 34、build 32、build 30 和 build 28 保留，见 [当前迭代](releases/20261025-09-tess-frosted-settings-ui.md)；其余历史条目仍只说明原产物位置。
 
 | 位置 | 内容 |
 | --- | --- |
-| `.build/local/0.2.0-build28/Tess.app` | 本轮原窗口输入候选，已签名并安装；用户已确认 ChatGPT Fn 自动输入正常 |
+| `.build/local/0.2.0-build36/Tess.app` | 当前柔雾材质与边缘优化候选，已签名并安装；待人工观感确认 |
+| `.build/local/0.2.0-build35/Tess.app` | 原生玻璃层候选；用户反馈整体不协调、边缘锐利，保留回退 |
+| `.build/local/0.2.0-build34/Tess.app` | 上一轮弱磨砂候选；用户反馈玻璃感不足，保留回退 |
+| `.build/local/0.2.0-build33/Tess.app` | 本轮材质检查过渡候选；剩余重分隔线已在 build 34 统一 |
+| `.build/local/0.2.0-build32/Tess.app` | 上一轮设置页与八个提示词模板候选，保留为本轮回退 |
+| `.build/local/0.2.0-build31/Tess.app` | 本轮界面检查过渡候选；保存按钮与模板误标已在 build 32 修复 |
+| `.build/local/0.2.0-build30/Tess.app` | 上一轮三个语音入口与提示词库候选，保留 |
+| `.build/local/0.2.0-build29/Tess.app` | 本轮过渡候选；编辑入口首次选中问题已在 build 30 修复 |
+| `.build/local/0.2.0-build28/Tess.app` | 上轮稳定回退；用户已确认 ChatGPT Fn 自动输入正常 |
 | `.build/local/0.2.0-build27/Tess.app` | 诊断版；ChatGPT 自动输入未通过，作为紧邻回退保留 |
 | `.build/local/0.2.0-build26/Tess.app` | 早期文字服务候选，保留 |
 | `.build/local/0.2.0-build25/Tess.app` | 本轮更新前从已安装应用保留的回退副本 |
