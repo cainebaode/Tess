@@ -6,6 +6,8 @@
 
 ## 当前状态
 
+2026-10-30（Mac 发布完成）：**Tess 0.3.0 build 41 已在 GitHub 正式公开并设为 Latest，官网首页、帮助和隐私已同步上线。** 源码、正式离线归档、App／DMG 独立签名公证、最终包浏览器下载与覆盖安装、设置和权限保留核对完成；完整匿名下载与公开三页摘要通过。上传故障已改用有百分比的 HTTP/1.1 方式解决，先前等待估算失效。此条覆盖下方“后台上传中”的历史状态；学习真人收益仍未验证。见 [正式发布记录](releases/20261030-01-tess-build41-public-release.md)及 [GitHub Release](https://github.com/cainebaode/Tess/releases/tag/v0.3.0-build41)。
+
 2026-10-30（Mac 发布）：**build 41 源码已同步 GitHub，App／DMG 公证与最终下载覆盖安装核对完成；DMG 正在后台上传，Release 仍是草稿，官网尚未切换。** 原设置、模型、权限和引导保留。按用户要求停止前台等待；后台只继续上传与摘要核对，公开发布、匿名下载和官网切换待回来检查后完成。接续位置、产物与服务器备份见 [build 41 发布记录](releases/20261030-01-tess-build41-public-release.md)。
 
 2026-10-29（Mac）：**0.3.0 build 41 已沿用原 Developer ID 签名，经 Finder 覆盖安装并启动，用户已确认小红书搜索框可以输入。** 针对小红书搜索框“未识别”的 Chrome `AX noValue` 诊断，补齐浏览器网页输入信息准备，并避免重复请求重启浏览器的两秒延迟。保留原输入位置验证与复制回退。隔离输入回归、构建、签名、35 个载荷文件、7 个模型文件及设置核对通过；真人复测对应诊断已取得 Chrome 输入框并发出粘贴。详见 [Chrome 输入修复记录](releases/20261029-01-tess-chrome-input-build41.md)。本轮不含公证、DMG 或公开发布。
