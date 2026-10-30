@@ -60,6 +60,21 @@ import Carbon
             precondition(!guardState.isValid, "User interaction and lost monitoring must invalidate")
         }
         let stopped = fnGuard()
+        InputInteractionGuard.hudWindowNumber = 321
+        for type: CGEventType in [.leftMouseDown, .scrollWheel, .leftMouseDragged] {
+            let hud = fnGuard()
+            let pointer = CGEvent(source: nil)!
+            pointer.type = type
+            hud.process(type, pointer, windowAtPointer: 321)
+            precondition(hud.isValid, "Nonactivating HUD interaction must keep the original target")
+            hud.process(type, pointer, windowAtPointer: 322)
+            precondition(!hud.isValid, "Another window still invalidates the target")
+        }
+        let hudKey = fnGuard()
+        let typed = event()
+        hudKey.process(.keyDown, typed, windowAtPointer: 321)
+        precondition(!hudKey.isValid, "Pointing at the HUD must not exempt typing")
+        InputInteractionGuard.hudWindowNumber = nil
         stopped.stop(); stopped.stop()
         stopped.applicationActivated(123)
         stopped.process(.flagsChanged, event(63))
@@ -102,8 +117,8 @@ import Carbon
         precondition(DeliveryService.visibleWindow(processID: 123, windows: [window(7), window(5)])?.id != selectedWindow?.id,
                      "Switching to another window in the same app must invalidate the recorded window")
         precondition(DeliveryService.visibleWindow(processID: 123, windows: [window(1, pid: 456)]) == nil)
-        // A cold desktop renderer exposes its input only after this request. Keep the
-        // request restricted to the two ChatGPT app identifiers, and preserve errors.
+        // Cold renderers need their own accessibility activation request. Chrome uses
+        // EnhancedUserInterface; Electron's ManualAccessibility is not supported there.
         for applicationID in ["com.openai.codex", "com.openai.chat"] {
             var prepared = false
             let result = DeliveryService.prepareDesktopAccessibility(applicationID: applicationID) { attribute in
@@ -115,7 +130,18 @@ import Carbon
             precondition(DeliveryService.prepareDesktopAccessibility(applicationID: applicationID,
                 setAttribute: { _ in .attributeUnsupported }) == .attributeUnsupported)
         }
-        for applicationID in [nil, "com.google.Chrome", "com.apple.TextEdit", "com.tencent.xinWeChat"] {
+        var browserRequests: [String] = []
+        let browserResult = DeliveryService.prepareDesktopAccessibility(applicationID: "com.google.Chrome") { attribute in
+            browserRequests.append(attribute)
+            return .success
+        }
+        precondition(browserRequests == ["AXEnhancedUserInterface"] && browserResult == .success,
+                     "Chrome must activate web accessibility before capturing a focused input")
+        for error in [AXError.attributeUnsupported, .notImplemented, .cannotComplete, .apiDisabled] {
+            precondition(DeliveryService.prepareDesktopAccessibility(applicationID: "com.google.Chrome",
+                setAttribute: { _ in error }) == error, "Activation must preserve the actual AX result")
+        }
+        for applicationID in [nil, "com.google.Chrome.fake", "com.apple.Safari", "com.apple.TextEdit", "com.tencent.xinWeChat"] {
             precondition(DeliveryService.prepareDesktopAccessibility(applicationID: applicationID,
                 setAttribute: { _ in preconditionFailure("Other applications must keep their existing AX behavior") }) == nil)
         }

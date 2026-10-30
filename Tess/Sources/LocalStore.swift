@@ -35,6 +35,7 @@ final class LocalStore {
             let data = try JSONEncoder().encode(value)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
                                                     attributes: [.posixPermissions: 0o700])
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
             if unreadableNames.contains(name) { try preserveUnreadableFile(name) }
             let file = directory.appendingPathComponent(name)
             try data.write(to: file, options: .atomic)
@@ -71,9 +72,17 @@ final class LocalStore {
     }
 
     func discardRecoveryCopy(_ file: URL) throws {
-        guard file.deletingLastPathComponent() == recoveryDirectory else { return }
+        guard file.deletingLastPathComponent().standardizedFileURL.path == recoveryDirectory.standardizedFileURL.path else { return }
         try FileManager.default.removeItem(at: file)
         hasRecoveryFiles = ((try? FileManager.default.contentsOfDirectory(atPath: recoveryDirectory.path)) ?? []).contains { $0.hasSuffix(".json") }
+    }
+
+    func discardRecoveryCopies(named name: String) throws {
+        guard FileManager.default.fileExists(atPath: recoveryDirectory.path) else { return }
+        let files = try FileManager.default.contentsOfDirectory(at: recoveryDirectory, includingPropertiesForKeys: nil)
+        for file in files where file.lastPathComponent.hasSuffix("-" + name) {
+            try discardRecoveryCopy(file)
+        }
     }
 
     private func preserve(_ data: Data, name: String) throws -> URL {

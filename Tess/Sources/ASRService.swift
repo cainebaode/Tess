@@ -261,7 +261,7 @@ final class ASRService {
         }
     }
 
-    func transcribePartial(_ audio: RecordedAudio, sessionID: UUID, language: String? = nil, model: ASRModel? = nil) async throws -> String {
+    func transcribePartial(_ audio: RecordedAudio, sessionID: UUID, language: String? = nil, model: ASRModel? = nil, context: String? = nil) async throws -> String {
         try Task.checkCancellation()
         guard audio.sessionID == sessionID, recordingProtected else { throw CancellationError() }
         guard !isTranscribing, finalizingID == nil, loadingModel == nil, partialTask == nil else { throw ASRError.busy }
@@ -271,7 +271,7 @@ final class ASRService {
         idleTask?.cancel()
         let id = UUID()
         let job = Task.detached(priority: .userInitiated) { [runtime] in
-            try await runtime.transcribe(audio.samples, model: model, language: language)
+            try await runtime.transcribe(audio.samples, model: model, language: language, context: context)
         }
         partialID = id
         partialTask = job
@@ -303,7 +303,7 @@ final class ASRService {
         }
     }
 
-    func transcribe(_ audio: RecordedAudio, sessionID: UUID, language: String? = nil, model: ASRModel? = nil) async throws -> String {
+    func transcribe(_ audio: RecordedAudio, sessionID: UUID, language: String? = nil, model: ASRModel? = nil, context: String? = nil) async throws -> String {
         guard !isTranscribing, finalizingID == nil else { throw ASRError.busy }
         guard audio.sessionID == sessionID else { throw CancellationError() }
         guard audio.hasSpeech, !audio.samples.isEmpty else { throw ASRError.silence }
@@ -320,7 +320,7 @@ final class ASRService {
         states[model] = .inUse
         activeID = sessionID
         let job = Task.detached(priority: .userInitiated) { [runtime] in
-            try await runtime.transcribe(audio.samples, model: model, language: language)
+            try await runtime.transcribe(audio.samples, model: model, language: language, context: context)
         }
         activeTask = job
         let wait = TranscriptionWait()
@@ -431,7 +431,7 @@ private actor ASRRuntime {
         whisper = nil
         loaded = nil
     }
-    func transcribe(_ samples: [Float], model: ASRModel, language: String?) async throws -> String {
+    func transcribe(_ samples: [Float], model: ASRModel, language: String?, context: String?) async throws -> String {
         guard loaded == model else { throw ASRError.modelNotReady }
         var offset = 0
         var output: [String] = []
@@ -450,7 +450,7 @@ private actor ASRRuntime {
                 if let qwen {
                     let hint = language == "zh" ? "Chinese" : language == "en" ? "English" : language
                     text = try qwen.transcribeCheckingCancellation(audio: chunk, sampleRate: 16_000,
-                        options: Qwen3DecodingOptions(maxTokens: 768, language: hint))
+                        options: Qwen3DecodingOptions(maxTokens: 768, language: hint, context: context))
                 } else if let whisper {
                     text = try await whisper.transcribeAudio(chunk, sampleRate: 16_000, language: language)
                 } else { throw ASRError.modelNotReady }

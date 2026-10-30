@@ -3,6 +3,7 @@ import SwiftUI
 struct ResultView: View {
   @Bindable var app: AppModel
   @State private var showOriginal = false
+  @State private var rememberingWord: SpeechWord?
   var body: some View {
     if !app.preferences.completedOnboarding {
       OnboardingView(app: app)
@@ -57,6 +58,7 @@ struct ResultView: View {
     .preferredColorScheme(.light)
     .tint(SettingsTheme.accent)
     .onChange(of: app.result?.id) { _, _ in showOriginal = false }
+    .sheet(item: $rememberingWord) { word in SpeechWordEditor(app: app, word: word) }
     }
   }
 
@@ -144,6 +146,40 @@ struct ResultView: View {
           ScrollView { Text(candidate).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 120)
         }.font(.caption)
       }
+      if let correction = app.result?.correction {
+        if !correction.edits.isEmpty {
+          DisclosureGroup(app.tr("术语修改记录", "Term changes")) {
+            ForEach(Array(correction.edits.enumerated()), id: \.offset) { _, edit in
+              Text("\(edit.source) → \(edit.replacement) · \(edit.basis == .user ? app.tr("用户确认", "Confirmed") : edit.basis == .spokenCorrection ? app.tr("口述修正", "Spoken correction") : app.tr("词库与语境", "Vocabulary and context"))")
+                .font(.caption).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            }
+          }.font(.caption)
+        }
+        ForEach(Array(correction.suggestions.enumerated()), id: \.offset) { _, suggestion in
+          HStack {
+            Text("\(suggestion.source) → \(suggestion.replacement)").textSelection(.enabled)
+            Spacer()
+            Button(app.tr("采用候选", "Apply suggestion")) { app.applySuggestion(suggestion) }
+              .disabled(app.busy || ContextCorrection.occurrences(of: suggestion.source, in: app.result?.output ?? "").count != 1)
+          }.font(.caption).buttonStyle(SettingsButtonStyle())
+        }
+        if !correction.suggestions.isEmpty {
+          Text(app.tr("候选尚未自动使用；采用后请重新复制。若原片段不唯一或已被模板改写，请对照原文手动编辑。",
+                      "Suggestions are not applied automatically. Copy again after accepting. If the source is repeated or reworded, review the original and edit manually."))
+            .font(.caption).foregroundStyle(SettingsTheme.secondary)
+        }
+      }
+      SpeechLearningResult(app: app)
+      Button(app.tr("记为常用词…", "Remember a word…")) {
+        var word = SpeechWord()
+        if let current = app.result {
+          let changes = SpeechDiff.differences(from: current.original, to: current.output)
+          if changes.count == 1, let change = changes.first {
+            word.spelling = change.spelling; word.aliases = [change.mistaken]
+          }
+        }
+        rememberingWord = word
+      }.buttonStyle(SettingsButtonStyle()).disabled(app.busy)
       textServiceHint
     }
   }

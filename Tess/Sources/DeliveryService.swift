@@ -9,6 +9,7 @@ final class DeliveryService {
         let processID: pid_t
         let applicationName: String
         let screenID: CGDirectDisplayID?
+        @MainActor var applicationID: String? { NSRunningApplication(processIdentifier: processID)?.bundleIdentifier }
         fileprivate enum Location {
             case input(AXUIElement, role: String, range: CFRange)
             case weChatWindow(AXUIElement, InputInteractionGuard)
@@ -53,6 +54,8 @@ final class DeliveryService {
     @ObservationIgnored private let pasteboard: NSPasteboard
     @ObservationIgnored private let diagnosticURL: URL?
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
+    @ObservationIgnored private var launchObserver: NSObjectProtocol?
+    @ObservationIgnored private var preparedChrome: NSRunningApplication?
     private(set) var diagnosticEvents: [DiagnosticEvent] = []
     private(set) var lastFailure: String?
     private var diagnosticSession = UUID()
@@ -73,24 +76,46 @@ final class DeliveryService {
         guard activationObserver == nil else { return }
         activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { notification in
+        ) { [weak self] notification in
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-            _ = MainActor.assumeIsolated { Self.prepareDesktopAccessibility(app) }
+            _ = MainActor.assumeIsolated { self?.prepareDesktopAccessibility(app) }
         }
-        if let app = NSWorkspace.shared.frontmostApplication { Self.prepareDesktopAccessibility(app) }
+        launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier == "com.google.Chrome" else { return }
+            _ = MainActor.assumeIsolated { self?.prepareDesktopAccessibility(app) }
+        }
+        for app in NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.Chrome") {
+            prepareDesktopAccessibility(app)
+        }
+        if let app = NSWorkspace.shared.frontmostApplication { prepareDesktopAccessibility(app) }
     }
 
-    // Electron builds its AX tree on demand. Prewarm on activation so the first Fn
-    // capture does not race renderer initialization. This neither reads nor edits text.
-    @discardableResult private static func prepareDesktopAccessibility(_ app: NSRunningApplication) -> AXError? {
-        return prepareDesktopAccessibility(applicationID: app.bundleIdentifier) { attribute in
+    // Chromium/Electron build web AX trees on demand. Chrome debounces activation
+    // for two seconds, so prepare at launch and never restart that timer on each Fn.
+    // The request neither reads nor edits text and does not grant system permission.
+    @discardableResult private func prepareDesktopAccessibility(_ app: NSRunningApplication) -> AXError? {
+        guard hasAccessibilityPermission else { return nil }
+        let isChrome = app.bundleIdentifier == "com.google.Chrome"
+        if isChrome, let preparedChrome, !preparedChrome.isTerminated,
+           preparedChrome.processIdentifier == app.processIdentifier { return nil }
+        let error = Self.prepareDesktopAccessibility(applicationID: app.bundleIdentifier) { attribute in
             let application = AXUIElementCreateApplication(app.processIdentifier)
             AXUIElementSetMessagingTimeout(application, 0.25)
             return AXUIElementSetAttributeValue(application, attribute as CFString, kCFBooleanTrue)
         }
+        // Chrome handles the activation before forwarding to AppKit, which can
+        // report an unsupported setter. Only transport/permission failures retry.
+        if isChrome, let error, [.success, .attributeUnsupported, .notImplemented].contains(error) {
+            preparedChrome = app
+        }
+        return error
     }
 
     static func prepareDesktopAccessibility(applicationID: String?, setAttribute: (String) -> AXError) -> AXError? {
+        if applicationID == "com.google.Chrome" { return setAttribute("AXEnhancedUserInterface") }
         guard ["com.openai.codex", "com.openai.chat"].contains(applicationID ?? "") else { return nil }
         return setAttribute("AXManualAccessibility")
     }
@@ -157,7 +182,7 @@ final class DeliveryService {
         guard let app = NSWorkspace.shared.frontmostApplication else { note("no_application", failure: true); return nil }
         guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { note("tess_frontmost", failure: true); return nil }
         guard !isTerminal(app) else { note("terminal", failure: true); return nil }
-        if let error = Self.prepareDesktopAccessibility(app) { note("desktop_accessibility_requested", error: error) }
+        if let error = prepareDesktopAccessibility(app) { note("desktop_accessibility_requested", error: error) }
         let focus = focusedElementResult(processID: app.processIdentifier)
         if let element = focus.element {
             guard let role = editableRole(element), let range = selectedRange(element) else { return nil }
@@ -194,7 +219,7 @@ final class DeliveryService {
                       screenID: screenID(for: window), location: .weChatWindow(window, interaction))
     }
 
-    func deliverVoice(text: String, target: Target?) async -> Outcome {
+    func deliverVoice(text: String, target: Target?, observation: SpeechInputObservation? = nil) async -> Outcome {
         guard !text.isEmpty else { return .unavailable("没有可插入的文字。") }
         guard !Task.isCancelled else { return .unavailable("已取消输入。") }
         guard let target, targetIsValid(target) else {
@@ -203,10 +228,10 @@ final class DeliveryService {
         }
         // A failed paste may mean the clipboard changed or could not be preserved.
         // Do not bypass that protection by replacing it with an automatic copy.
-        return await paste(text: text, target: target)
+        return await paste(text: text, target: target, observation: observation)
     }
 
-    func paste(text: String, target: Target?) async -> Outcome {
+    func paste(text: String, target: Target?, observation: SpeechInputObservation? = nil) async -> Outcome {
         defer { target?.stopTracking() }
         guard !text.isEmpty else { return .unavailable("没有可插入的文字。") }
         guard !Task.isCancelled, let target, targetIsValid(target) else {
@@ -216,13 +241,19 @@ final class DeliveryService {
               let up = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: false) else {
             return .unavailable("无法模拟粘贴，请复制文字。")
         }
-        return await pasteUsingClipboard(text: text, validateTarget: { self.targetIsValid(target) }) {
+        let outcome = await pasteUsingClipboard(text: text, validateTarget: { self.targetIsValid(target) }) {
+            if case .input(let element, _, let range) = target.location {
+                observation?.prepare(element: element, processID: target.processID, range: range, text: text)
+            }
             down.flags = .maskCommand
             up.flags = .maskCommand
             self.note("paste_posted")
             down.postToPid(target.processID)
             up.postToPid(target.processID)
         }
+        if case .attemptedPaste = outcome { await observation?.verifyAndStart() }
+        else { observation?.stop() }
+        return outcome
     }
 
     // The clipboard transaction is separate from system targeting so its recovery can be checked
@@ -461,11 +492,13 @@ final class DeliveryService {
 
     isolated deinit {
         if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+        if let launchObserver { NSWorkspace.shared.notificationCenter.removeObserver(launchObserver) }
     }
 }
 
 // A session-scoped compatibility guard; ordinary key contents are never read or retained.
 @MainActor final class InputInteractionGuard {
+    static var hudWindowNumber: Int?
     private let processID: pid_t
     private let shortcut: (keyCode: UInt32, modifiers: UInt32)
     private var shortcutHeld = true // The triggering down precedes capture/start.
@@ -516,9 +549,25 @@ final class DeliveryService {
 
     // Internal entry points let checks drive metadata without installing a live event tap.
     func process(_ type: CGEventType, _ event: CGEvent) {
+        let window: Int
+        if type == .scrollWheel, Self.hudWindowNumber != nil {
+            // CGEvent's mouse-window fields are not populated for scroll events.
+            let point = NSPoint(x: event.location.x, y: (NSScreen.screens.first?.frame.maxY ?? 0) - event.location.y)
+            window = NSWindow.windowNumber(at: point, belowWindowWithWindowNumber: 0)
+        } else {
+            window = Int(event.getIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent))
+        }
+        process(type, event, windowAtPointer: window)
+    }
+
+    func process(_ type: CGEventType, _ event: CGEvent, windowAtPointer: Int) {
         guard isValid else { return }
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput { isValid = false; return }
         guard Self.watched.contains(type) else { return } // Fn/modifier flagsChanged is not observed.
+        if type != .keyDown && type != .keyUp, let window = Self.hudWindowNumber, window > 0,
+           windowAtPointer == window {
+            return // Reading/operating Tess's nonactivating HUD does not change the destination.
+        }
         if type == .keyDown || type == .keyUp {
             let code = event.getIntegerValueField(.keyboardEventKeycode)
             // A tapped Fn can also emit the system Globe key (179).

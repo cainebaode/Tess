@@ -28,6 +28,9 @@ struct HUDSnapshot: Equatable, Sendable {
   var retryTitle: String? = nil
   var settingsTitle: String? = nil
   var transcript = ""
+  var sessionID: UUID? = nil
+  var hasHeardSpeech = false
+  var canUseOriginal = false
 }
 
 /// One presentation for live sessions and the explicitly isolated native preview.
@@ -41,8 +44,13 @@ struct HUDView: View {
   var onResult: () -> Void = {}
   var onConfirm: () -> Void = {}
   var onSettings: () -> Void = {}
+  var onUseOriginal: () -> Void = {}
   var previewReduceMotion = false
   var isVisible = true
+  var cardWidth: CGFloat = 400
+  var transcriptHeight: CGFloat = 144
+  @State private var followsLatest = true
+  @State private var userScrolling = false
 
   @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
   @Environment(\.colorSchemeContrast) private var contrast
@@ -75,6 +83,18 @@ struct HUDView: View {
   private var hasStage: Bool {
     [.preparing, .transcribing, .processing, .delivering].contains(snapshot.phase)
   }
+  private var showsTranscript: Bool {
+    [.preparing, .recording, .transcribing, .processing, .delivering].contains(snapshot.phase) || !snapshot.transcript.isEmpty
+  }
+  private var transcriptLabel: String {
+    switch snapshot.phase {
+    case .recording, .preparing: tr("实时转录 · 未定稿", "Live transcript · Draft")
+    case .transcribing: tr("转录草稿 · 正在定稿", "Draft · Finalizing")
+    case .processing: tr("转录原文 · 整理中", "Transcript · Editing")
+    case .failed: tr("转录草稿 · 未完成", "Draft · Incomplete")
+    default: tr("最终文字", "Final text")
+    }
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -102,33 +122,66 @@ struct HUDView: View {
           .background(tint.opacity(0.13), in: Circle())
           .accessibilityHidden(true)
       }
+      .frame(height: 64)
 
       if snapshot.phase == .recording {
         amplitudeHistory
-          .transition(.opacity)
+          .frame(height: 40)
       } else if hasStage {
         processingStage
-          .transition(.opacity)
+          .frame(height: 40)
+      } else if showsTranscript {
+        Color.clear.frame(height: 40)
       }
 
-      if snapshot.phase == .recording || !snapshot.transcript.isEmpty {
+      if showsTranscript {
         VStack(alignment: .leading, spacing: 5) {
-          Text(snapshot.phase == .recording ? tr("最近转录 · 实时更新", "Recent transcript · Live") : tr("转录内容", "Transcript"))
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(SettingsTheme.hudForeground.opacity(0.6))
           ScrollViewReader { reader in
+            HStack {
+              Text(transcriptLabel)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(SettingsTheme.hudForeground.opacity(0.6))
+              Spacer(minLength: 4)
+              Button(tr("回到最新", "Latest")) {
+                followsLatest = true
+                reader.scrollTo("transcript-end", anchor: .bottom)
+              }
+              .buttonStyle(.plain).font(.system(size: 10, weight: .medium))
+              .opacity(followsLatest ? 0 : 1).disabled(followsLatest)
+              .accessibilityHidden(followsLatest)
+            }.frame(height: 18)
             ScrollView {
               VStack(alignment: .leading, spacing: 0) {
-                Text(snapshot.transcript.isEmpty ? tr("等待语音转录…", "Waiting for speech…") : snapshot.transcript)
-                  .font(.system(size: 13))
+                Text(snapshot.transcript.isEmpty
+                     ? (snapshot.hasHeardSpeech ? tr("正在生成转录…", "Generating transcript…")
+                        : tr("说话后，文字会显示在这里。", "Your speech will appear here.")) : snapshot.transcript)
+                  .font(.system(size: 15)).lineSpacing(5)
                   .foregroundStyle(SettingsTheme.hudForeground.opacity(snapshot.transcript.isEmpty ? 0.5 : 0.95))
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .fixedSize(horizontal: false, vertical: true)
-                Color.clear.frame(height: 1).id("transcript-end")
+                Color.clear.frame(height: 8).id("transcript-end")
               }
             }
-            .frame(height: 76)
-            .onChange(of: snapshot.transcript) { _, _ in reader.scrollTo("transcript-end", anchor: .bottom) }
+            .frame(height: transcriptHeight)
+            .onScrollPhaseChange { _, phase in
+              userScrolling = phase == .tracking || phase == .interacting || phase == .decelerating
+            }
+            .onScrollGeometryChange(for: HUDScrollMetrics.self) { geometry in
+              HUDScrollMetrics(offset: geometry.contentOffset.y,
+                               bottom: geometry.contentSize.height - geometry.containerSize.height + geometry.contentInsets.bottom)
+            } action: { old, new in
+              if userScrolling, abs(new.offset - old.offset) > 0.5 { followsLatest = new.isAtBottom }
+            }
+            .onChange(of: snapshot.transcript) { _, _ in
+              guard followsLatest else { return }
+              Task { @MainActor in
+                await Task.yield()
+                if followsLatest { reader.scrollTo("transcript-end", anchor: .bottom) }
+              }
+            }
+            .onChange(of: snapshot.sessionID) { old, new in
+              if new != nil, new != old { followsLatest = true; reader.scrollTo("transcript-end", anchor: .bottom) }
+            }
           }
         }
         .padding(10)
@@ -151,9 +204,10 @@ struct HUDView: View {
         actions
       }
       .controlSize(.small)
+      .frame(height: 30)
     }
     .padding(16)
-    .frame(width: 348, alignment: .topLeading)
+    .frame(width: cardWidth, alignment: .topLeading)
     .background {
       RoundedRectangle(cornerRadius: 22, style: .continuous)
         .fill(SettingsTheme.hudBackground)
@@ -167,7 +221,6 @@ struct HUDView: View {
         .strokeBorder(SettingsTheme.hudForeground.opacity(contrast == .increased ? 0.45 : 0.1), lineWidth: 1)
     }
     .shadow(color: .black.opacity(0.3), radius: 15, y: 7)
-    .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(duration: 0.3, bounce: 0.06), value: snapshot.phase)
     .preferredColorScheme(.dark)
     .foregroundStyle(SettingsTheme.hudForeground)
     .accessibilityElement(children: .contain)
@@ -185,7 +238,7 @@ struct HUDView: View {
               Capsule().fill(tint)
                 .frame(width: max(3, geometry.size.width * CGFloat(values.last ?? 0)))
             }
-        }.frame(height: 4).padding(.vertical, 16)
+        }.frame(height: 4).padding(.vertical, 5)
       } else {
         HStack(alignment: .center, spacing: 4) {
           ForEach(values.indices, id: \.self) { index in
@@ -193,10 +246,10 @@ struct HUDView: View {
               .fill(LinearGradient(colors: [SettingsTheme.hudForeground, tint],
                                    startPoint: .top, endPoint: .bottom))
               .opacity(0.3 + Double(index) / 31 * 0.7)
-              .frame(width: 5, height: max(3, CGFloat(min(1, max(0, values[index]))) * 34))
+              .frame(width: 5, height: max(3, CGFloat(min(1, max(0, values[index]))) * 18))
           }
         }
-        .frame(maxWidth: .infinity).frame(height: 36)
+        .frame(maxWidth: .infinity).frame(height: 18)
         .animation(.linear(duration: 0.08), value: values)
         .shadow(color: tint.opacity(Double(values.last ?? 0) * 0.32), radius: 6)
       }
@@ -237,6 +290,8 @@ struct HUDView: View {
           .buttonStyle(HUDButtonStyle(primary: true))
       } else if snapshot.phase == .selectingTarget {
         Button(snapshot.confirmTitle ?? tr("确认位置", "Confirm"), action: onConfirm).buttonStyle(HUDButtonStyle(primary: true))
+      } else if snapshot.canUseOriginal {
+        Button(tr("使用原文", "Use original"), action: onUseOriginal).buttonStyle(HUDButtonStyle(primary: true))
       }
     } else if snapshot.phase != .cancelled {
       if snapshot.phase == .failed {
@@ -265,6 +320,12 @@ struct HUDView: View {
   }
 
   private func tr(_ zh: String, _ en: String) -> String { snapshot.isEnglish ? en : zh }
+}
+
+struct HUDScrollMetrics: Equatable {
+  var offset: CGFloat
+  var bottom: CGFloat
+  var isAtBottom: Bool { bottom <= 0 || offset >= bottom - 12 }
 }
 
 private struct HUDButtonStyle: ButtonStyle {

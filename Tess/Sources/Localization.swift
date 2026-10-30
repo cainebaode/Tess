@@ -25,6 +25,11 @@ struct AppPreferences: Codable {
   var onboardingPracticePassed: Bool? = nil
   var asrModel: ASRModel? = nil
   var microphoneID: UInt32? = nil
+  var speechVocabulary: SpeechVocabulary? = nil
+  var contextCorrectionModes: [TextMode]? = nil
+  var speechLearningEnabled: Bool? = nil
+
+  func correctsContext(for mode: TextMode) -> Bool { contextCorrectionModes?.contains(mode) == true }
 
   var availablePrompts: [TextPrompt] { promptLibrary ?? TextPrompt.defaults }
   func prompt(for mode: TextMode) -> TextPrompt? {
@@ -113,4 +118,8 @@ struct SavedResult: Codable {
   var mode: TextMode
   var message: String?
   var origin: String
+  var correction: CorrectionRecord? = nil
+  var speechBaseline: SpeechBaseline? = nil
+  var editRevision: Int? = nil
+  var speechLearningExcluded: Bool? = nil
 }

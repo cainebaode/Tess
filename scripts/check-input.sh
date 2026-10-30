@@ -12,8 +12,8 @@ Path(".build/verification/checks/ASRModel.swift").write_text("import Foundation\
 PY
 xcrun swiftc -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
   -module-cache-path .build/cache/CheckModuleCache \
-  .build/verification/checks/ASRModel.swift Tess/Sources/Localization.swift \
+  .build/verification/checks/ASRModel.swift Tess/Sources/Localization.swift Tess/Sources/SpeechLearning.swift Tess/Sources/SpeechInputObservation.swift \
   Tess/Sources/HotkeyService.swift Tess/Sources/DeliveryService.swift \
-  Tess/Sources/TextService.swift Tess/Sources/APIConfiguration.swift Tess/Sources/LocalStore.swift \
+  Tess/Sources/TextService.swift Tess/Sources/SpeechVocabulary.swift Tess/Sources/APIConfiguration.swift Tess/Sources/LocalStore.swift \
   Tess/Checks/InputCheck.swift -o .build/verification/checks/input-check
 .build/verification/checks/input-check

@@ -165,10 +165,16 @@ final class AudioRecorder {
         return audio
     }
 
-    func snapshot(sessionID: UUID, maximumDuration: TimeInterval = 12) -> RecordedAudio? {
+    func snapshot(sessionID: UUID, maximumDuration: TimeInterval = 12, startingAt: Int? = nil) -> RecordedAudio? {
         guard isRecording, self.sessionID == sessionID,
-              let capture = buffer?.snapshot(maximumSamples: Int(maximumDuration * 16_000)) else { return nil }
-        return RecordedAudio(sessionID: sessionID, samples: capture, sampleRate: 16_000, hasSpeech: true)
+              let capture = buffer?.snapshot(maximumSamples: Int(maximumDuration * 16_000), startingAt: startingAt) else { return nil }
+        let voiced = stride(from: 0, to: capture.count, by: 800).reduce(0) { total, start in
+            let window = capture[start..<min(start + 800, capture.count)]
+            let energy = window.reduce(Float(0)) { $0 + $1 * $1 } / Float(window.count)
+            return total + (energy >= 0.006 * 0.006 ? window.count : 0)
+        }
+        let hasSpeech = startingAt == nil || voiced >= 4_000
+        return RecordedAudio(sessionID: sessionID, samples: capture, sampleRate: 16_000, hasSpeech: hasSpeech)
     }
 
     func cancel(sessionID: UUID) {
@@ -262,9 +268,15 @@ private final class CaptureBuffer: @unchecked Sendable {
         samples.append(contentsOf: values)
     }
 
-    func snapshot(maximumSamples: Int) -> [Float]? {
+    func snapshot(maximumSamples: Int, startingAt: Int? = nil) -> [Float]? {
         lock.lock()
         defer { lock.unlock() }
+        if let start = startingAt {
+            guard accepting, start >= 0, maximumSamples > 0, samples.count - start >= 8_000 else { return nil }
+            // Fixed preview chunks retain earlier text without retranscribing five minutes
+            // on every update. Final recognition still receives the complete recording.
+            return Array(samples[start..<min(start + maximumSamples, samples.count)])
+        }
         guard accepting, samples.count >= 8_000, maximumSamples > 0,
               lastVoicedSample > lastSnapshotVoicedSample else { return nil }
         let start = max(0, samples.count - maximumSamples)

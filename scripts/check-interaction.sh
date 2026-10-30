@@ -24,7 +24,16 @@ Path(".build/verification/checks/InteractionTypes.swift").write_text("\n".join(t
 PY
 xcrun swiftc -D TESS_INTERNAL_CHECKS -swift-version 6 -strict-concurrency=complete -parse-as-library -target arm64-apple-macos26.0 \
   -module-cache-path .build/cache/CheckModuleCache \
-  .build/verification/checks/InteractionTypes.swift Tess/Sources/Localization.swift \
-  Tess/Sources/AppModel.swift Tess/Sources/LocalStore.swift Tess/Sources/APIConfiguration.swift Tess/Sources/TextService.swift \
-  Tess/Checks/InteractionCheck.swift -o .build/verification/checks/interaction-check
-.build/verification/checks/interaction-check
+  .build/verification/checks/InteractionTypes.swift Tess/Sources/Localization.swift Tess/Sources/SpeechLearning.swift Tess/Sources/SpeechInputObservation.swift \
+  Tess/Sources/AppModel.swift Tess/Sources/LocalStore.swift Tess/Sources/APIConfiguration.swift Tess/Sources/TextService.swift Tess/Sources/SpeechVocabulary.swift \
+  Tess/Checks/InteractionCheck.swift Tess/Checks/SpeechLearningCheck.swift -o .build/verification/checks/interaction-check
+task_endpoint=$(mktemp -t tess-interaction-endpoint)
+python3 Tess/Checks/text_service_fixture.py "$task_endpoint" &
+task_server=$!
+trap 'kill "$task_server" 2>/dev/null || true; rm -f "$task_endpoint"' EXIT
+for task_attempt in {1..50}; do
+  [[ -s "$task_endpoint" ]] && break
+  sleep 0.1
+done
+[[ -s "$task_endpoint" ]]
+TESS_TEST_TEXT_URL="$(cat "$task_endpoint")" .build/verification/checks/interaction-check

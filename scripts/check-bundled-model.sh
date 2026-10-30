@@ -10,7 +10,7 @@ a=source.index('private actor ASRRuntime {');b=source.index('private final class
 source=source[:a]+'''private actor ASRRuntime {
  func prepare(model: ASRModel, directory: URL) async throws {}
  func unload() {}
- func transcribe(_ samples: [Float], model: ASRModel, language: String?) async throws -> String { "isolated" }
+ func transcribe(_ samples: [Float], model: ASRModel, language: String?, context: String?) async throws -> String { "isolated" }
 }
 '''+source[b:]
 audio=Path('Tess/Sources/AudioRecorder.swift').read_text()

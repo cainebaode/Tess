@@ -8,6 +8,7 @@ import Foundation
     var partials = ["第一段转录", "第一段修正后的转录"]
     var holdPartial = false
     private(set) var partialCalls = 0
+    private(set) var contexts: [String?] = []
     private(set) var pendingPartial: CheckedContinuation<String, Never>?
     init(modelsDirectory: URL) {}
     func isReady(_ model: ASRModel) -> Bool { true }
@@ -15,17 +16,19 @@ import Foundation
     func setRecording(_ value: Bool) {}
     func cancel() {}
     func cancelPartialTranscription() {}
-    func transcribePartial(_ audio: RecordedAudio, sessionID: UUID, language: String?, model: ASRModel?) async throws -> String {
+    func transcribePartial(_ audio: RecordedAudio, sessionID: UUID, language: String?, model: ASRModel?, context: String?) async throws -> String {
         precondition(audio.sessionID == sessionID)
         partialCalls += 1
+        contexts.append(context)
         if holdPartial { return await withCheckedContinuation { pendingPartial = $0 } }
         return partials.count > 1 ? partials.removeFirst() : partials[0]
     }
     func completeHeldPartial(_ text: String) {
         let continuation = pendingPartial; pendingPartial = nil; continuation?.resume(returning: text)
     }
-    func transcribe(_ audio: RecordedAudio, sessionID: UUID, language: String?, model: ASRModel?) async throws -> String {
+    func transcribe(_ audio: RecordedAudio, sessionID: UUID, language: String?, model: ASRModel?, context: String?) async throws -> String {
         precondition(audio.sessionID == sessionID, "Retry audio must receive its new session ID")
+        contexts.append(context)
         return try transcripts.removeFirst().get()
     }
 }
@@ -42,13 +45,19 @@ enum ASRError: Error { case silence, isolatedFailure }
     var onError: ((Error) -> Void)?
     private(set) var startCount = 0
     private var sessionID: UUID?
-    func start(sessionID: UUID) async throws { self.sessionID = sessionID; startCount += 1 }
+    var previewSamples = 0
+    func start(sessionID: UUID) async throws { self.sessionID = sessionID; startCount += 1; previewSamples = 0 }
     func stop() -> RecordedAudio? {
         sessionID.map { RecordedAudio(sessionID: $0, samples: [0.1], sampleRate: 16_000, hasSpeech: hasSpeech) }
     }
     func cancel() { sessionID = nil; elapsed = 0 }
     func cancel(sessionID: UUID) { if self.sessionID == sessionID { cancel() } }
-    func snapshot(sessionID: UUID) -> RecordedAudio? { self.sessionID == sessionID ? stop() : nil }
+    func snapshot(sessionID: UUID, startingAt: Int? = nil) -> RecordedAudio? {
+        guard self.sessionID == sessionID else { return nil }
+        previewSamples += 8_000
+        let count = min(12 * 16_000, max(0, previewSamples - (startingAt ?? 0)))
+        return RecordedAudio(sessionID: sessionID, samples: Array(repeating: 0.1, count: count), sampleRate: 16_000, hasSpeech: true)
+    }
 }
 
 @MainActor final class HotkeyService {
@@ -72,6 +81,7 @@ enum ASRError: Error { case silence, isolatedFailure }
 @MainActor final class DeliveryService {
     final class Target {
         var applicationName = "Isolated editor"
+        var applicationID: String? = "test.editor"
         var screenID: CGDirectDisplayID? = nil
         private(set) var stopTrackingCount = 0
         func stopTracking() { stopTrackingCount += 1 }
@@ -92,7 +102,7 @@ enum ASRError: Error { case silence, isolatedFailure }
         capturedTargets.append(target)
         return target
     }
-    func deliverVoice(text: String, target: Target?) async -> Outcome {
+    func deliverVoice(text: String, target: Target?, observation: SpeechInputObservation? = nil) async -> Outcome {
         precondition(target != nil, "Ordinary voice delivery must retain a target")
         delivered.append(text)
         if holdDelivery { await withCheckedContinuation { pendingDelivery = $0 } }
@@ -282,6 +292,8 @@ enum ASRError: Error { case silence, isolatedFailure }
             try? FileManager.default.removeItem(at: root)
         }
         try await checkPromptPreferences(root: root)
+        try await checkSpeechOptimizations(root: root)
+        try await SpeechLearningCheck.run(root: root)
 
         // Local notifications exercise production observer routing without sleeping the Mac.
         let interrupted = try Scenario(root: root)
@@ -557,5 +569,70 @@ enum ASRError: Error { case silence, isolatedFailure }
         late.app.shutdown()
 
         print("Interaction checks passed against production AppModel: immediate target tracking stop on cancellation, finish and recapture with a late delivery retained; sleep/session interruption and recovery with shortcut suspension preserved, live preview revisions, cancellation/reentry and final-only delivery, target-before-hide, voice/retry delivery, timed HUD dismissal and recording reentry, Always preview, explicit image annotation, capture cancellation/failures/retry, and cancelled late capture after reentry. Only isolated files and external-service substitutes used; no microphone, permissions, clipboard, Keychain or API calls.")
+    }
+
+    private static func checkSpeechOptimizations(root: URL) async throws {
+        let scenario = try Scenario(root: root)
+        precondition(scenario.app.preferences.speechVocabulary == nil && scenario.app.preferences.contextCorrectionModes == nil)
+        let vocabulary = SpeechVocabulary(enabled: true, scene: "产品需求", words: [SpeechWord(spelling: "PRD", meaning: "产品需求文档", aliases: ["PLD"])])
+        precondition(scenario.app.saveVocabulary(vocabulary))
+        scenario.app.startRecording(mode: .raw)
+        try await waitFor("vocabulary preview") { scenario.app.asr.partialCalls > 0 }
+        let firstContext = scenario.app.asr.contexts[0]
+        var changed = vocabulary; changed.scene = "下一次录音"; changed.words = []
+        precondition(scenario.app.saveVocabulary(changed))
+        scenario.app.stopRecording()
+        try await waitFor("vocabulary final") { !scenario.app.busy }
+        precondition(scenario.app.asr.contexts.allSatisfy { $0 == firstContext }, "Preview and final must share the recording-start vocabulary")
+        precondition(firstContext?.contains("PRD") == true && firstContext?.contains("PLD") == false)
+        scenario.app.shutdown()
+
+        let history = try Scenario(root: root)
+        history.app.startRecording(mode: .raw)
+        try await waitFor("history recording") { history.app.isRecording }
+        history.app.recorder.previewSamples = 192_000
+        try await waitFor("first completed chunk") { history.app.liveTranscript == "第一段转录" }
+        try await waitFor("second preview chunk") { history.app.liveTranscript == "第一段转录 第一段修正后的转录" }
+        history.app.stopRecording()
+        precondition(history.app.hudSnapshot.transcript.contains("第一段转录"), "Finalization must keep readable draft text")
+        try await waitFor("complete history") { !history.app.busy }
+        precondition(history.app.hudSnapshot.transcript == history.app.result?.output)
+        precondition(history.app.delivery.delivered == ["隔离语音结果"])
+        history.app.shutdown()
+
+        let unavailable = try Scenario(root: root)
+        unavailable.app.preferences.contextCorrectionModes = [.raw]
+        try await record(unavailable)
+        precondition(unavailable.app.delivery.delivered == ["隔离语音结果"] && unavailable.app.result?.message?.isEmpty == false,
+                     "No configured correction service must retain and deliver the original once")
+        unavailable.app.shutdown()
+
+        guard let endpoint = ProcessInfo.processInfo.environment["TESS_TEST_TEXT_URL"] else { return }
+        let processing = try Scenario(root: root)
+        precondition(processing.app.saveVocabulary(vocabulary))
+        processing.app.preferences.contextCorrectionModes = [.raw]
+        var configuration = APIPreset.all.first { $0.id == "ollama" }!.configuration()
+        configuration.baseURL = endpoint; configuration.modelID = "slow"
+        precondition(processing.app.configurations.save(configuration))
+        let saved = processing.app.configurations.configurations[0]
+        precondition(processing.app.configurations.markTested(saved, result: TextResult(original: "样例", output: "结果", modelID: "slow")))
+        precondition(processing.app.configurations.setCurrent(saved.id))
+        processing.app.asr.transcripts = [.success("产品需求 PLD")]
+        processing.app.startRecording(mode: .raw)
+        try await waitFor("correction recording") { processing.app.isRecording }
+        processing.app.stopRecording()
+        try await waitFor("correction processing") { processing.app.isTextProcessing }
+        precondition(processing.app.hudSnapshot.canUseOriginal)
+        processing.app.useOriginal()
+        processing.app.useOriginal()
+        try await waitFor("immediate original") { !processing.app.busy }
+        precondition(processing.app.delivery.delivered == ["产品需求 PLD"] && processing.app.result?.output == "产品需求 PLD")
+        processing.app.preferences.contextCorrectionModes = []
+        processing.app.asr.transcripts = [.success("新会话原文")]
+        try await record(processing)
+        try await Task.sleep(for: .milliseconds(150))
+        precondition(processing.app.delivery.delivered == ["产品需求 PLD", "新会话原文"] && processing.app.result?.output == "新会话原文",
+                     "Cancelled correction must not deliver twice or overwrite the next recording")
+        processing.app.shutdown()
     }
 }

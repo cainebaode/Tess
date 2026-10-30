@@ -92,7 +92,8 @@ struct SettingsView: View {
             .font(.caption).foregroundStyle(SettingsTheme.muted).padding(.top, 12).padding(.bottom, 4)
             HStack(spacing: 14) {
                 Text(app.tr("语音输入", "Dictation")).frame(width: 100, alignment: .leading)
-                Text(app.tr("原文 · 不加工", "Original transcript")).foregroundStyle(SettingsTheme.secondary)
+                Text(app.preferences.correctsContext(for: .raw) ? app.tr("原文 · 上下文校正", "Transcript · Correction")
+                     : app.tr("原文 · 不加工", "Original transcript")).foregroundStyle(SettingsTheme.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 HStack(spacing: 8) {
                     Text("Fn").font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -223,6 +224,7 @@ struct SettingsView: View {
 
     private var speech: some View {
         VStack(spacing: 18) {
+            SpeechVocabularyView(app: app)
             SettingsCard(title: app.tr("本地识别模型", "LOCAL RECOGNITION MODELS")) {
                 notice(app.tr("基础模型随应用提供，其他模型可按需下载。音频只在本机处理。较大的模型需要更多存储和内存。",
                               "The basic model is included; additional models can be downloaded. Audio stays on this Mac. Larger models need more storage and memory."))
@@ -402,12 +404,12 @@ struct SettingsView: View {
                 SettingsRow(title: app.tr("屏幕捕获", "Screen capture"), description: app.tr("仅一次性选区截图，首次截图时申请。", "One selected area at a time; requested on first capture.")) {
                     Button(app.tr("系统设置", "System Settings")) { openPermission("Privacy_ScreenCapture") }.buttonStyle(SettingsButtonStyle())
                 }
-                notice(app.tr("仅识别快捷键和输入目标保护所需的事件，不读取或保存打字正文。不会申请全盘访问、通讯录或照片权限。",
-                              "Tess only interprets events needed for shortcuts and input-target protection. Typed text is never read or stored. Tess does not request full disk, contacts or photo access."))
+                notice(app.tr("快捷键与输入保护不读取键入字符。主动开启纠正学习后，仅对本次已验证插入的普通输入框短期读取改稿，最长 120 秒；失焦即停止。不支持时由你主动提交。不会申请全盘访问、通讯录或照片权限。",
+                              "Shortcut and input protection do not read typed characters. If you enable learning, Tess briefly reads edits in this session’s verified ordinary input field, for up to 120 seconds while focused. Unsupported fields use manual submission. Tess does not request full disk, contacts or photo access."))
             }
             SettingsCard(title: app.tr("自动输入诊断", "AUTOMATIC INPUT DIAGNOSTICS")) {
-                notice(app.tr("ChatGPT 桌面版无法提供输入框信息时，使用原窗口兼容输入：先点击聊天输入框再录音，期间点击、打字或切换应用会改为复制。无法验证输入框类型和光标，不要用于密码输入。",
-                              "When ChatGPT desktop does not expose its input field, Tess uses the original window. Click the chat field before dictating; clicking, typing or switching apps during the session falls back to Copy. Field type and caret cannot be verified. Do not use this for passwords."))
+                notice(app.tr("ChatGPT 桌面版无法提供输入框信息时，使用原窗口兼容输入：先点击聊天输入框再录音，期间点击浮窗以外位置、打字或切换应用会改为复制。无法验证输入框类型和光标，不要用于密码输入。",
+                              "When ChatGPT desktop does not expose its input field, Tess uses the original window. Click the chat field before dictating; clicking outside the overlay, typing or switching apps falls back to Copy. Field type and caret cannot be verified. Do not use this for passwords."))
                 notice(app.delivery.failureDescription(chinese: app.preferences.language.usesChinese)
                        ?? app.tr("录音后可查看本次输入状态；详细原因可复制供排查。", "After dictating, copy the input diagnostics to investigate delivery problems."))
                 notice(app.tr("仅在本机保留最近 100 条状态，记录应用标识和系统错误码，不记录录音、转写、输入框正文或剪贴板内容。",
@@ -419,6 +421,8 @@ struct SettingsView: View {
             SettingsCard(title: app.tr("数据与清理", "DATA & CLEANUP")) {
                 notice(app.tr("API 密钥仅保存在 Keychain。基础模型随应用提供，额外模型保存在 Tess 模型目录。最近结果与截图草稿最多保留 24 小时；清除暂存内容不会删除模型或 API 配置。",
                               "API credentials are stored only in Keychain. The basic model is included with Tess; downloaded models stay in its model directory. Recent results and screenshot drafts expire after 24 hours. Clearing temporary content keeps models and API configurations."))
+                notice(app.tr("确认后的纠正记忆独立保存在本机，可在“语音识别 → 已学习内容”停用、删除或清空；清除暂存结果不会清空记忆。个人记忆不自动加入远端文字校正材料，不保存日常录音。",
+                              "Confirmed correction memories stay separately on this Mac. Disable, delete or clear them in Speech recognition → Learned words. Clearing temporary results keeps memories. Personal memories are not automatically added to remote correction material; daily audio is not saved."))
                 notice(app.tr("自动粘贴会短暂使用剪贴板并尽力恢复可恢复内容；仅当剪贴板没有被其他操作更改时恢复。显式复制会保留 Tess 内容。剪贴板管理器及通用剪贴板可能接触这些内容。",
                               "Pasting briefly uses the clipboard and restores recoverable content only if it has not changed. Explicit Copy keeps Tess content on the clipboard. Clipboard managers and Universal Clipboard may see it."))
                 notice(app.tr("Tess 不建立账号、云中转或远程使用统计。第三方服务及目标应用的数据保留由对方决定。",

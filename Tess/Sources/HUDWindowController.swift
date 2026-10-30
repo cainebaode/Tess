@@ -4,6 +4,8 @@ import SwiftUI
 
 @MainActor @Observable private final class HUDVisibility {
   var visible = false
+  var cardWidth: CGFloat = 400
+  var transcriptHeight: CGFloat = 144
 }
 
 /// A nonactivating, top-anchored panel. Only its visible lifetime owns a SwiftUI tree.
@@ -14,12 +16,13 @@ import SwiftUI
   private var presentation: Task<Void, Never>?
   private var session: UUID?
   private var topAnchor = CGPoint.zero
+  private var availableFrame = CGRect.zero
   private var displayID: CGDirectDisplayID?
   private var displayObserver: NSObjectProtocol?
   var window: NSWindow { panel }
 
   init() {
-    panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 220),
+    panel = FloatingPanel(contentRect: NSRect(x: 0, y: 0, width: 432, height: 430),
                           styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     panel.isOpaque = false
     panel.backgroundColor = .clear
@@ -56,6 +59,7 @@ import SwiftUI
     }
     panel.ignoresMouseEvents = false
     panel.orderFrontRegardless()
+    InputInteractionGuard.hudWindowNumber = panel.windowNumber
     presentation = Task { @MainActor [weak self] in
       await Task.yield()
       guard !Task.isCancelled else { return }
@@ -68,6 +72,7 @@ import SwiftUI
     presentation?.cancel()
     visibility.visible = false
     panel.ignoresMouseEvents = true
+    InputInteractionGuard.hudWindowNumber = nil
     if immediately { tearDown(); return }
     dismissal = Task { @MainActor [weak self] in
       do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
@@ -90,11 +95,15 @@ import SwiftUI
     // safeAreaInsets protects the camera housing even with an auto-hidden menu bar.
     topAnchor = CGPoint(x: screen.visibleFrame.midX,
                         y: min(screen.visibleFrame.maxY, screen.frame.maxY - screen.safeAreaInsets.top) - 8)
+    availableFrame = screen.visibleFrame.insetBy(dx: 8, dy: 8)
+    visibility.cardWidth = min(400, availableFrame.width - 32)
+    visibility.transcriptHeight = min(144, max(48, topAnchor.y - availableFrame.minY - 300))
     resize(height: panel.frame.height)
   }
 
   private func resize(height: CGFloat) {
-    let size = NSSize(width: 380, height: max(90, min(430, ceil(height))))
+    let size = NSSize(width: visibility.cardWidth + 32,
+                      height: max(90, min(topAnchor.y - availableFrame.minY, ceil(height))))
     let frame = NSRect(x: topAnchor.x - size.width / 2, y: topAnchor.y - size.height, width: size.width, height: size.height)
     if panel.frame != frame { panel.setFrame(frame, display: true) }
   }
@@ -111,7 +120,8 @@ private struct LiveHUD: View {
             onStop: { app.stopRecording() }, onCancel: { app.cancel() },
             onRetry: { app.retryFromHUD() },
             onResult: { app.hideHUD?(); app.showResult() }, onConfirm: { app.confirmInsertion() },
-            onSettings: { app.openScreenCaptureSettings() }, isVisible: visibility.visible)
+            onSettings: { app.openScreenCaptureSettings() }, onUseOriginal: { app.useOriginal() },
+            isVisible: visibility.visible, cardWidth: visibility.cardWidth, transcriptHeight: visibility.transcriptHeight)
       .opacity(visibility.visible ? 1 : 0)
       .scaleEffect(reduceMotion ? 1 : visibility.visible ? 1 : 0.94, anchor: .top)
       .offset(y: reduceMotion || visibility.visible ? 0 : -4)

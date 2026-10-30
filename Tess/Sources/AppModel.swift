@@ -42,12 +42,26 @@ enum SessionPhase: Equatable {
   private var task: Task<Void, Never>?
   private var liveTranscriptionTask: Task<Void, Never>?
   private var liveTranscriptionUnavailable = false
+  private var processingAutomatic = false
+  private var heardSpeech = false
   private var sessionID: UUID?
   private var target: DeliveryService.Target? { willSet { target?.stopTracking() } }
   private var pendingInsertion: String?
   private var cleanupTimer: Timer?
   private var interruptedObservers: [NSObjectProtocol] = []
   private var snapshot: AppPreferences?
+  private var speechPrompt = SpeechPromptSnapshot(context: nil, memoryIDs: [], omittedCount: 0)
+  private var speechTargetID: String?
+  private var speechTargetName: String?
+  private(set) var speechMemories: [SpeechMemory] = []
+  private(set) var learningReview: SpeechLearningReview?
+  private(set) var learningNotice = ""
+  private(set) var lastRememberedMemoryID: UUID?
+  private(set) var speechPromptOmittedCount = 0
+  @ObservationIgnored private var learningTask: Task<Void, Never>?
+  @ObservationIgnored private var learningIgnored: Set<String> = []
+  @ObservationIgnored private var speechObservation: SpeechInputObservation?
+  @ObservationIgnored private var speechObservationID: UUID?
   private var snapshotConfig: APIConfiguration?
   private var snapshotKey: String?
   private var retryAudio: RecordedAudio?
@@ -88,12 +102,12 @@ enum SessionPhase: Equatable {
       state = .preparing; title = status
       detail = tr("就绪后即可说话 · Esc 取消", "Speak when ready · Esc cancels")
     case .recording:
-      state = .recording; title = tr("正在聆听", "Listening")
+      state = .recording; title = tr("正在听", "Listening")
       detail = liveTranscriptionUnavailable
         ? tr("实时转录暂不可用，录音仍在继续；结束后识别完整内容。", "Live preview unavailable. Recording continues; the full audio will be transcribed when you stop.")
         : recorder.elapsed >= 270 ? status : recordingHint
     case .transcribing:
-      state = .transcribing; title = tr("正在识别语音", "Transcribing speech")
+      state = .transcribing; title = tr("正在生成最终转录", "Finalizing transcript")
       detail = tr("录下的声音在本机处理", "Audio is processed on this Mac")
     case .processing:
       state = .processing; title = tr("正在整理文字", "Editing text")
@@ -122,12 +136,15 @@ enum SessionPhase: Equatable {
                        mode: captureFailure == nil ? modeTitle(snapshot?.textMode ?? .raw, settings: snapshot) : "",
                        elapsed: recorder.elapsed, levels: recorder.levelHistory, isSilent: recorder.isQuiet,
                        canRetry: state == .failed, isEnglish: !preferences.language.usesChinese,
-                       includesEditing: (snapshot?.textMode ?? preferences.textMode) != .raw,
+                       includesEditing: (snapshot?.textMode ?? preferences.textMode) != .raw
+                         || snapshot?.correctsContext(for: snapshot?.textMode ?? .raw) == true,
                        canShowResult: captureFailure == nil && result != nil,
                        confirmTitle: target == nil ? tr("确认位置", "Confirm destination") : tr("确认粘贴", "Confirm paste"),
                        retryTitle: captureFailure != nil ? tr("重试截图", "Retry capture") : canRetryTranscription ? tr("重试识别", "Retry") : tr("再试一次", "Try again"),
                        settingsTitle: captureFailure == .permissionRequired ? tr("打开设置", "Open Settings") : nil,
-                       transcript: [.recording, .transcribing, .processing, .delivering].contains(phase) ? liveTranscript : "")
+                       transcript: captureFailure == nil && (phase != .idle || hudFeedback != .cancelled) ? liveTranscript : "",
+                       sessionID: sessionID, hasHeardSpeech: heardSpeech,
+                       canUseOriginal: isTextProcessing && draft?.original.isEmpty == false)
   }
   var selectedTargetName: String? { target?.applicationName }
   var imageURL: URL? {
@@ -152,6 +169,9 @@ enum SessionPhase: Equatable {
     if case .value(let value) = store.read(AppPreferences.self, name: "preferences.json") { loadedPreferences = value }
     loadedPreferences.migrate()
     preferences = loadedPreferences
+    if case .value(let memories) = store.read([SpeechMemory].self, name: SpeechLearning.fileName) {
+      speechMemories = memories.filter(\.isValid)
+    }
     if case .value(let value) = store.read(SavedResult?.self, name: "recent.json") { recent = value }
     if case .value(let value) = store.read(SavedResult?.self, name: "draft.json") { draft = value }
     configurations = APIConfigurationStore(storageDirectory: directory)
@@ -225,6 +245,22 @@ enum SessionPhase: Equatable {
     preferences.microphoneID = recorder.selectedDeviceID
     persist(preferences, name: "preferences.json")
   }
+  @discardableResult func saveVocabulary(_ vocabulary: SpeechVocabulary) -> Bool {
+    guard vocabulary.scene.count <= 240, vocabulary.words.count <= SpeechVocabulary.wordLimit,
+          vocabulary.words.allSatisfy(\.isValid), Set(vocabulary.words.map(\.id)).count == vocabulary.words.count,
+          Set(vocabulary.words.map { $0.spelling.lowercased() }).count == vocabulary.words.count else { return false }
+    var next = preferences
+    next.speechVocabulary = vocabulary
+    guard persist(next, name: "preferences.json") else { return false }
+    preferences = next
+    return true
+  }
+  @discardableResult func saveWord(_ word: SpeechWord) -> Bool {
+    var vocabulary = preferences.speechVocabulary ?? SpeechVocabulary()
+    if let index = vocabulary.words.firstIndex(where: { $0.id == word.id }) { vocabulary.words[index] = word }
+    else { vocabulary.words.append(word) }
+    return saveVocabulary(vocabulary)
+  }
   @discardableResult func savePromptLibrary(_ prompts: [TextPrompt]) -> Bool {
     guard !prompts.isEmpty, prompts.allSatisfy(\.isValid), Set(prompts.map(\.id)).count == prompts.count,
           [TextMode.custom1, .custom2].allSatisfy({ mode in
@@ -288,6 +324,8 @@ enum SessionPhase: Equatable {
 
   func startRecording(mode: TextMode? = nil, attachingToScreenshot: Bool = false) {
     guard !busy else { if phase != .capturing { showHUD?() }; return }
+    stopSpeechObservation()
+    clearLearningReview()
     if !preferences.completedOnboarding, (preferences.onboardingStep ?? 0) < 3 {
       openResult?()
       return
@@ -301,7 +339,7 @@ enum SessionPhase: Equatable {
       showSettings(.general)
       return
     }
-    guard selectedMode == .raw || configurations.current?.testStatus == .passed else {
+    guard selectedMode == .raw || configurations.current?.testStatus == .passed || preferences.correctsContext(for: selectedMode) else {
       status = tr("请先配置并测试文字服务，再使用整理快捷键。", "Configure and test a text service before using an editing shortcut.")
       hideHUD?()
       showSettings(.text)
@@ -317,6 +355,7 @@ enum SessionPhase: Equatable {
     let id = UUID()
     liveTranscript = ""
     liveTranscriptionUnavailable = false
+    heardSpeech = false
     hudFeedback = .preparing
     retryAudio = nil; retryExpiry?.cancel()
     sessionID = id
@@ -330,9 +369,16 @@ enum SessionPhase: Equatable {
     snapshot = preferences
     snapshot?.textMode = selectedMode
     snapshot?.asrModel = asr.selectedModel
+    speechTargetID = target?.applicationID
+    speechTargetName = target?.applicationName
+    speechPrompt = SpeechPromptSnapshot.make(vocabulary: snapshot?.speechVocabulary ?? SpeechVocabulary(),
+      learningEnabled: preferences.speechLearningEnabled == true, memories: speechMemories,
+      applicationID: speechTargetID, supportsHints: asr.selectedModel != .whisper)
+    speechPromptOmittedCount = speechPrompt.omittedCount
+    if practicing { snapshot?.contextCorrectionModes = [] }
     snapshotConfig = configurations.current.flatMap { $0.testStatus == .passed ? $0 : nil }
     snapshotKey = nil
-    if selectedMode != .raw, let configuration = snapshotConfig {
+    if selectedMode != .raw || snapshot?.correctsContext(for: selectedMode) == true, let configuration = snapshotConfig {
       snapshotKey = try? configurations.apiKey(for: configuration)
     }
     phase = .loading
@@ -364,25 +410,47 @@ enum SessionPhase: Equatable {
     liveTranscriptionTask?.cancel()
     let language = snapshot?.recognitionLanguage ?? "auto"
     let model = snapshot?.asrModel
+    let context = speechPrompt.context
     liveTranscriptionTask = Task { [weak self] in
       var failures = 0
+      var offset = 0
+      var completedChunks: [String] = []
+      var lastSampleCount = 0
+      let chunkSamples = 12 * 16_000
       while !Task.isCancelled {
         do { try await Task.sleep(for: .milliseconds(800)) } catch { return }
         guard let self, self.sessionID == id, self.phase == .recording else { return }
-        guard let audio = self.recorder.snapshot(sessionID: id) else { continue }
+        guard let audio = self.recorder.snapshot(sessionID: id, startingAt: offset), audio.samples.count != lastSampleCount else { continue }
+        lastSampleCount = audio.samples.count
+        guard audio.hasSpeech else {
+          if audio.samples.count == chunkSamples { offset += chunkSamples; lastSampleCount = 0 }
+          continue
+        }
+        self.heardSpeech = true
         do {
           let partial = try await self.asr.transcribePartial(audio, sessionID: id,
-                                                           language: language == "auto" ? nil : language, model: model)
+                                                           language: language == "auto" ? nil : language, model: model, context: context)
           guard self.sessionID == id, self.phase == .recording, !Task.isCancelled else { return }
           let text = partial.trimmingCharacters(in: .whitespacesAndNewlines)
-          if !text.isEmpty { self.liveTranscript = text }
+          if !text.isEmpty {
+            self.liveTranscript = (completedChunks + [text]).joined(separator: " ")
+            if audio.samples.count == chunkSamples {
+              completedChunks.append(text)
+              offset += chunkSamples
+              lastSampleCount = 0
+            }
+          }
           failures = 0
           self.liveTranscriptionUnavailable = false
         } catch is CancellationError { return }
-        catch ASRError.silence { continue }
+        catch ASRError.silence {
+          if audio.samples.count == chunkSamples { offset += chunkSamples; lastSampleCount = 0 }
+          continue
+        }
         catch {
           guard self.sessionID == id, self.phase == .recording, !Task.isCancelled else { return }
           failures += 1
+          lastSampleCount = 0
           self.liveTranscriptionUnavailable = failures >= 2
         }
       }
@@ -416,7 +484,8 @@ enum SessionPhase: Equatable {
       guard let self else { return }
       do {
         let language = self.snapshot?.recognitionLanguage ?? "auto"
-        let transcript = try await self.asr.transcribe(audio, sessionID: id, language: language == "auto" ? nil : language, model: self.snapshot?.asrModel)
+        let transcript = try await self.asr.transcribe(audio, sessionID: id, language: language == "auto" ? nil : language,
+                                                     model: self.snapshot?.asrModel, context: self.speechPrompt.context)
         guard self.sessionID == id, !Task.isCancelled else { return }
         let original = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !original.isEmpty else { self.finish(self.tr("未取得有效转写。", "No transcript was produced."), showResult: false, feedback: .failed); return }
@@ -443,6 +512,7 @@ enum SessionPhase: Equatable {
 
   func retryTranscription() {
     guard !busy, let audio = retryAudio else { return }
+    stopSpeechObservation()
     statusHUDTask?.cancel()
     captureFailure = nil
     let id = UUID(); sessionID = id
@@ -453,12 +523,13 @@ enum SessionPhase: Equatable {
     phase = .transcribing
     status = tr("正在重试识别…", "Retrying transcription…")
     hotkeys.enableEscape(true); showHUD?()
-    snapshotKey = snapshot?.textMode == .raw ? nil : snapshotConfig.flatMap { try? configurations.apiKey(for: $0) }
+    snapshotKey = snapshotConfig.flatMap { try? configurations.apiKey(for: $0) }
     task = Task { [weak self] in
       guard let self else { return }
       do {
         let language = self.snapshot?.recognitionLanguage ?? "auto"
-        let transcript = try await self.asr.transcribe(audio.withSessionID(id), sessionID: id, language: language == "auto" ? nil : language, model: self.snapshot?.asrModel)
+        let transcript = try await self.asr.transcribe(audio.withSessionID(id), sessionID: id, language: language == "auto" ? nil : language,
+                                                     model: self.snapshot?.asrModel, context: self.speechPrompt.context)
         guard self.sessionID == id, !Task.isCancelled else { return }
         let original = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !original.isEmpty else { throw ASRError.silence }
@@ -494,8 +565,12 @@ enum SessionPhase: Equatable {
 
   func reprocess() {
     guard !busy, var current = result, !current.original.isEmpty else { return }
+    stopSpeechObservation(); clearLearningReview()
+    // Reprocessing creates model-generated text, never human recognition feedback.
+    current.speechLearningExcluded = true
     current.mode = preferences.textMode
     current.output = current.original; current.candidate = nil; current.message = nil
+    current.correction = nil
     replaceDraft(current)
     guard persistResult() else { return }
     beginProcessing()
@@ -508,7 +583,7 @@ enum SessionPhase: Equatable {
     let id = UUID(); sessionID = id
     phase = .processing
     snapshot = preferences; snapshotConfig = configurations.current.flatMap { $0.testStatus == .passed ? $0 : nil }
-    snapshotKey = preferences.textMode == .raw ? nil : snapshotConfig.flatMap { try? configurations.apiKey(for: $0) }
+    snapshotKey = snapshotConfig.flatMap { try? configurations.apiKey(for: $0) }
     hotkeys.enableEscape(true)
     task = Task { [weak self] in await self?.processCurrent(id: id, automatic: false) }
   }
@@ -516,17 +591,41 @@ enum SessionPhase: Equatable {
   private func processCurrent(id: UUID, automatic: Bool) async {
     guard let current = draft else { return }
     let mode = current.mode
-    if mode != .raw {
+    processingAutomatic = automatic
+    let correction = snapshot?.correctsContext(for: mode) == true ? (snapshot?.speechVocabulary ?? SpeechVocabulary()) : nil
+    if mode != .raw || correction != nil {
       phase = .processing
       status = tr("正在处理文字…", "Processing text…")
       let processed = await textService.process(current.original, mode: mode, configuration: snapshotConfig, apiKey: snapshotKey,
-                                               prompts: snapshot?.textPrompts ?? TextPrompts(), prompt: snapshot?.prompt(for: mode))
+                                               prompts: snapshot?.textPrompts ?? TextPrompts(), prompt: snapshot?.prompt(for: mode), correction: correction)
       guard sessionID == id, !Task.isCancelled, !processed.isCancelled else { return }
       draft?.output = processed.output
       draft?.candidate = processed.candidate
+      draft?.correction = processed.correction
       draft?.message = processed.error?.message ?? processed.warnings.joined(separator: "\n")
+      if correction != nil, !preferences.language.usesChinese {
+        if let error = processed.error {
+          draft?.message = error.category == .timeout
+            ? "Context correction exceeded 8 seconds; using the original."
+            : "Context correction was unavailable or failed validation; using the original. Check the text service or retry."
+        } else if processed.correction?.suggestions.isEmpty == false {
+          draft?.message = "Review correction suggestions in the result panel; they have not been applied."
+        }
+      }
     }
-    guard sessionID == id, !Task.isCancelled, let completed = draft else { return }
+    await completeCurrent(id: id, automatic: automatic)
+  }
+
+  private func completeCurrent(id: UUID, automatic: Bool) async {
+    guard sessionID == id, !Task.isCancelled, var completed = draft else { return }
+    if automatic, completed.origin == "voice", completed.speechBaseline == nil {
+      completed.speechBaseline = SpeechBaseline(sessionID: id, original: completed.original, delivered: completed.output,
+        mode: completed.mode.rawValue, textProcessed: snapshot?.correctsContext(for: completed.mode) == true || completed.mode != .raw,
+        applicationID: speechTargetID, applicationName: speechTargetName, model: (snapshot?.asrModel ?? .qwenSmall).rawValue,
+        promptSnapshotID: speechPrompt.id, promptVersion: SpeechPromptSnapshot.version)
+      draft = completed
+    }
+    liveTranscript = completed.output
     replaceRecent(completed)
     guard persistResult() else {
       finish(tr("结果尚未保存，请先在面板复制并检查存储空间。", "The result could not be saved. Copy it from the panel and check free space."), showResult: true, feedback: .failed)
@@ -536,12 +635,14 @@ enum SessionPhase: Equatable {
     if !preview {
       phase = .delivering
       status = tr("正在输出…", "Delivering text…")
-      let outcome = await delivery.deliverVoice(text: completed.output, target: target)
+      let observation = makeSpeechObservation(for: completed)
+      let outcome = await delivery.deliverVoice(text: completed.output, target: target, observation: observation)
       guard sessionID == id, !Task.isCancelled else { return }
       var message = deliveryMessage(outcome)
-      if completed.mode != .raw, completed.message?.isEmpty == false, completed.output == completed.original {
+      if completed.message?.isEmpty == false, completed.output == completed.original {
         message = tr("本次使用原文。", "Using the original transcript. ") + message
       }
+      if completed.message?.isEmpty == false { message += " " + (completed.message ?? "") }
       finish(message, showResult: outcome.isUnavailable, showStatus: true,
              feedback: outcome.isCopied ? .copied : outcome.isUnavailable ? .failed : .completed)
     } else { finish(completed.message ?? tr("结果已保留，请检查后使用。", "Result saved. Review before using."), showResult: true) }
@@ -550,12 +651,41 @@ enum SessionPhase: Equatable {
 
   func useOriginal() {
     guard !busy || isTextProcessing else { return }
-    if isTextProcessing { task?.cancel(); finish("", showResult: false) }
+    if isTextProcessing {
+      task?.cancel()
+      let id = UUID()
+      sessionID = id
+      let original = draft?.original ?? ""
+      draft?.output = original
+      draft?.candidate = nil; draft?.correction = nil
+      draft?.message = tr("已选择原文。", "Original selected.")
+      phase = .delivering
+      let automatic = processingAutomatic
+      task = Task { [weak self] in await self?.completeCurrent(id: id, automatic: automatic) }
+      return
+    }
     guard var current = result else { return }
+    stopSpeechObservation(); clearLearningReview()
     current.output = current.original
+    current.editRevision = (current.editRevision ?? 0) + 1
     current.mode = .raw
     current.candidate = nil
+    current.correction = nil
     current.message = tr("已切换为原文；已有输入请手动替换。", "Original restored. Replace any previous input manually.")
+    if draft != nil { draft = current } else { recent = current }
+    status = current.message ?? ""
+    persistResult()
+  }
+
+  func applySuggestion(_ suggestion: TermEdit) {
+    guard !busy, var current = result, current.correction?.suggestions.contains(suggestion) == true,
+          ContextCorrection.occurrences(of: suggestion.source, in: current.output).count == 1,
+          let range = current.output.range(of: suggestion.source) else { return }
+    current.output.replaceSubrange(range, with: suggestion.replacement)
+    current.correction?.suggestions.removeAll { $0 == suggestion }
+    var accepted = suggestion; accepted.basis = .user
+    current.correction?.edits.append(accepted)
+    current.message = tr("已采用候选；已有输入请手动替换。", "Suggestion applied. Replace any previous input manually.")
     if draft != nil { draft = current } else { recent = current }
     status = current.message ?? ""
     persistResult()
@@ -563,8 +693,157 @@ enum SessionPhase: Equatable {
 
   func editOutput(_ text: String) {
     guard !busy else { return }
-    if draft != nil { draft?.output = text } else { recent?.output = text }
+    stopSpeechObservation()
+    acceptSpeechEdit(text, source: .resultPage)
+  }
+
+  var canSubmitSpeechEdit: Bool {
+    preferences.speechLearningEnabled == true && !busy && result?.origin == "voice"
+      && result?.speechLearningExcluded != true && result?.speechBaseline?.eligible == true
+      && result.map { Date().timeIntervalSince($0.createdAt) < 86_400 } == true
+  }
+  var speechMemoryConflicts: Set<UUID> { SpeechLearning.conflicts(in: speechMemories) }
+
+  func setSpeechLearning(_ enabled: Bool) {
+    // Stopping collection is immediate, even if saving the preference fails.
+    preferences.speechLearningEnabled = enabled
+    if !enabled { stopSpeechObservation(); clearLearningReview() }
+    savePreferences()
+  }
+
+  @discardableResult func submitSpeechEdit(_ text: String, resultID: UUID, revision: Int) -> Bool {
+    guard canSubmitSpeechEdit, result?.id == resultID, (result?.editRevision ?? 0) == revision,
+          !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 8_000 else { return false }
+    stopSpeechObservation()
+    acceptSpeechEdit(text, source: .submitted)
+    return true
+  }
+
+  func beginSpeechSubmission() { stopSpeechObservation() }
+
+  private func acceptSpeechEdit(_ text: String, source: SpeechEditSource) {
+    guard var current = result, current.output != text else { return }
+    current.output = text
+    current.editRevision = (current.editRevision ?? 0) + 1
+    if draft != nil { draft = current } else { recent = current }
     persistResult()
+    clearLearningReview()
+    guard preferences.speechLearningEnabled == true, current.origin == "voice", current.speechLearningExcluded != true,
+          let baseline = current.speechBaseline, baseline.eligible,
+          Date().timeIntervalSince(current.createdAt) < 86_400 else { return }
+    let resultID = current.id, revision = current.editRevision ?? 0
+    learningTask = Task { [weak self] in
+      if source != .inputField {
+        do { try await Task.sleep(for: .seconds(1)) } catch { return }
+      }
+      let differences = await Task.detached(priority: .utility) {
+        SpeechDiff.differences(from: baseline.delivered, to: text)
+      }.value
+      guard let self, !Task.isCancelled, self.preferences.speechLearningEnabled == true,
+            self.result?.id == resultID, self.result?.editRevision == revision,
+            self.result?.output == text, self.result?.speechBaseline == baseline,
+            self.result.map({ Date().timeIntervalSince($0.createdAt) < 86_400 }) == true else { return }
+      let pending = differences.filter { !self.learningIgnored.contains($0.key)
+        && !SpeechLearning.alreadyKnown($0, applicationID: baseline.applicationID, memories: self.speechMemories) }
+      self.learningReview = pending.isEmpty ? nil : SpeechLearningReview(resultID: resultID, revision: revision,
+        baseline: baseline, edited: text, source: source, createdAt: Date(), differences: pending)
+      self.learningNotice = text == baseline.delivered ? "" : pending.isEmpty
+        ? self.tr("改稿已保留；没有可确认的新听写纠正。内容改写、歧义或已记住的词不会重复提示。",
+                  "Edits saved. No new recognition correction to confirm. Rewrites, ambiguous edits and known words are not suggested.") : ""
+    }
+  }
+
+  @discardableResult func rememberSpeechDifference(_ difference: SpeechDifference, review: SpeechLearningReview,
+                                                  allApplications: Bool = false) -> Bool {
+    guard canSubmitSpeechEdit, let active = learningReview, active.resultID == review.resultID,
+          active.revision == review.revision, active.differences.contains(difference),
+          result?.id == review.resultID, result?.output == review.edited,
+          (result?.editRevision ?? 0) == review.revision, result?.speechBaseline == review.baseline,
+          Date().timeIntervalSince(review.createdAt) < 86_400,
+          allApplications || review.baseline.applicationID != nil,
+          SpeechDiff.differences(from: review.baseline.delivered, to: review.edited).contains(where: {
+            $0.key == difference.key && $0.range == difference.range
+          }) else { return false }
+    let memory = SpeechMemory(mistaken: difference.mistaken, spelling: difference.spelling,
+      applicationID: review.baseline.applicationID, applicationName: review.baseline.applicationName,
+      allApplications: allApplications, confirmedAt: Date(), source: review.source, resultID: review.resultID)
+    if speechMemories.contains(where: { $0.mistaken == memory.mistaken && $0.spelling == memory.spelling && $0.sameScope(as: memory) }) {
+      ignoreSpeechDifference(difference); return true
+    }
+    guard speechMemories.count < SpeechLearning.limit else {
+      learningNotice = tr("已达到 50 条，请先在语音识别设置中管理已学习内容。", "50 memories reached. Manage learned words in Speech settings first.")
+      return false
+    }
+    guard persist(speechMemories + [memory], name: SpeechLearning.fileName) else { return false }
+    speechMemories.append(memory)
+    lastRememberedMemoryID = memory.id
+    ignoreSpeechDifference(difference)
+    learningNotice = speechMemoryConflicts.contains(memory.id)
+      ? tr("已保存，但与已有纠正冲突，双方暂停提示。请在已学习内容中停用其中一项或调整范围。",
+           "Saved with a conflict. Both hints are paused. Disable one or adjust its scope in learned words.")
+      : tr("记住了这次用词，下次 Qwen 识别时参考。", "Remembered for the next Qwen recognition.")
+    return true
+  }
+
+  func ignoreSpeechDifference(_ difference: SpeechDifference) {
+    learningIgnored.insert(difference.key)
+    learningReview?.differences.removeAll { $0.id == difference.id }
+    if learningReview?.differences.isEmpty == true { learningReview = nil }
+  }
+
+  @discardableResult func updateSpeechMemory(_ memory: SpeechMemory) -> Bool {
+    guard memory.isValid, let index = speechMemories.firstIndex(where: { $0.id == memory.id }) else { return false }
+    var next = speechMemories; next[index] = memory
+    guard persist(next, name: SpeechLearning.fileName) else { return false }
+    speechMemories = next
+    return true
+  }
+
+  func deleteSpeechMemory(_ id: UUID) {
+    let next = speechMemories.filter { $0.id != id }
+    guard persist(next, name: SpeechLearning.fileName) else { return }
+    speechMemories = next
+    stopSpeechObservation(); clearLearningReview()
+    if lastRememberedMemoryID == id { lastRememberedMemoryID = nil }
+  }
+
+  func undoLastSpeechMemory() {
+    if let id = lastRememberedMemoryID { deleteSpeechMemory(id) }
+  }
+
+  func clearSpeechMemories() {
+    stopSpeechObservation(); clearLearningReview()
+    guard persist([SpeechMemory](), name: SpeechLearning.fileName) else { return }
+    speechMemories = []; lastRememberedMemoryID = nil
+    do { try localStore.discardRecoveryCopies(named: SpeechLearning.fileName) }
+    catch { status = tr("学习内容已清空，但恢复副本删除失败，请检查本地存储。", "Memories cleared, but recovery copies could not be removed. Check local storage.") }
+    updateStorageNotice()
+  }
+
+  private func clearLearningReview() {
+    learningTask?.cancel(); learningTask = nil; learningReview = nil; learningNotice = ""
+  }
+
+  private func stopSpeechObservation() {
+    speechObservationID = nil
+    speechObservation?.stop(); speechObservation = nil
+  }
+
+  private func makeSpeechObservation(for completed: SavedResult) -> SpeechInputObservation? {
+    stopSpeechObservation()
+    guard preferences.speechLearningEnabled == true, completed.speechLearningExcluded != true, completed.speechBaseline?.eligible == true,
+          completed.origin == "voice" else { return nil }
+    let token = UUID()
+    var expectedRevision = completed.editRevision ?? 0
+    let observation = SpeechInputObservation { [weak self] text in
+      guard let self, self.speechObservationID == token, self.preferences.speechLearningEnabled == true,
+            self.result?.id == completed.id, self.result?.speechBaseline == completed.speechBaseline,
+            (self.result?.editRevision ?? 0) == expectedRevision else { return }
+      self.acceptSpeechEdit(text, source: .inputField)
+      expectedRevision = self.result?.editRevision ?? 0
+    }
+    speechObservationID = token; speechObservation = observation
+    return observation
   }
   func copyResult() {
     guard let result, !result.output.isEmpty else { return }
@@ -676,6 +955,7 @@ enum SessionPhase: Equatable {
   }
 
   func cancel() {
+    stopSpeechObservation()
     recordKeyGesture.reset()
     activeRecordAction = nil
     statusHUDTask?.cancel()
@@ -698,6 +978,7 @@ enum SessionPhase: Equatable {
   func shutdown() { cancel(); retryAudio = nil; retryExpiry?.cancel(); savePreferences(); persistResult(); hotkeys.suspend() }
   func clearTemporaryContent() {
     cancel()
+    clearLearningReview(); learningIgnored.removeAll()
     retryAudio = nil; retryExpiry?.cancel()
     for current in [recent, draft].compactMap({ $0 }) {
       if let name = current.imageName, isCaptureName(name) { pendingCaptureDeletions.insert(name) }
@@ -754,11 +1035,13 @@ enum SessionPhase: Equatable {
     return saved
   }
   private func replaceDraft(_ value: SavedResult?) {
+    if let value, value.id != result?.id { stopSpeechObservation(); clearLearningReview(); learningIgnored.removeAll() }
     let oldImage = draft?.imageName
     draft = value
     deleteUnreferencedImage(oldImage)
   }
   private func replaceRecent(_ value: SavedResult?) {
+    if let value, value.id != result?.id { stopSpeechObservation(); clearLearningReview(); learningIgnored.removeAll() }
     let oldImage = recent?.imageName
     recent = value
     deleteUnreferencedImage(oldImage)
@@ -774,6 +1057,7 @@ enum SessionPhase: Equatable {
     for isDraft in [false, true] {
       let value = isDraft ? draft : recent
       if let value, value.createdAt < cutoff {
+        if value.id == result?.id { stopSpeechObservation(); clearLearningReview() }
         if isDraft { draft = nil } else { recent = nil }
         deleteUnreferencedImage(value.imageName)
         if isDraft, value.origin == "manual-draft" { manualText = ""; showingManualInput = false }

@@ -20,7 +20,7 @@ private actor ASRRuntime {
         Self.probe.end()
     }
     func unload() {}
-    func transcribe(_ samples: [Float], model: ASRModel, language: String?) async throws -> String {
+    func transcribe(_ samples: [Float], model: ASRModel, language: String?, context: String?) async throws -> String {
         Self.probe.begin()
         await Task.detached { try? await Task.sleep(for: .milliseconds(120)) }.value
         Self.probe.end()
@@ -66,6 +66,11 @@ source += '''
         append(16_000, value: 0.03)
         let bounded = capture.snapshot(maximumSamples: 16_000)!
         precondition(bounded.count == 16_000 && bounded.last == 0.03, "Preview must use the latest bounded audio")
+        let firstChunk = capture.snapshot(maximumSamples: 16_000, startingAt: 0)!
+        let secondChunk = capture.snapshot(maximumSamples: 16_000, startingAt: 16_000)!
+        precondition(firstChunk.count == 16_000 && firstChunk.first == 0, "Fixed preview must retain the beginning, not just the tail")
+        precondition(secondChunk.count == 16_000 && secondChunk.first == 0.03, "Next preview must start at its exact sample offset")
+        precondition(capture.snapshot(maximumSamples: 16_000, startingAt: 100_000) == nil)
         let final = capture.finish()
         precondition(final.samples.count == 56_000 && final.hasSpeech, "Previews must preserve the entire final recording")
         precondition(capture.snapshot(maximumSamples: 16_000) == nil, "Stopped recording must not emit previews")

@@ -203,6 +203,7 @@ struct TextResult: Codable, Sendable {
     var usage: TokenUsage?
     var modelID: String?
     var isCancelled = false
+    var correction: CorrectionRecord? = nil
     var usedOriginal: Bool { output == original }
 }
 
@@ -214,12 +215,15 @@ struct TextService: Sendable {
         "明天下午三点，哦不，四点开会，只请产品和开发参加。"
     ]
     func process(_ input: String, mode: TextMode, configuration: APIConfiguration?, apiKey: String? = nil,
-                 prompts: TextPrompts = TextPrompts(), prompt: TextPrompt? = nil) async -> TextResult {
+                 prompts: TextPrompts = TextPrompts(), prompt: TextPrompt? = nil,
+                 correction: SpeechVocabulary? = nil) async -> TextResult {
         let start = Date()
         let original = Self.cleanRaw(input)
         var result = TextResult(original: original, output: original)
         guard !Task.isCancelled else { result.isCancelled = true; return result }
-        guard mode != .raw, !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return result }
+        guard mode != .raw || correction != nil, !original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return result }
+        let timeout: TimeInterval = correction == nil ? Self.requestTimeout : 8
+        let timeoutMessage = correction == nil ? "文字处理超过 60 秒，已保留原文。" : "上下文校正超过 8 秒，已保留原文。"
         guard original.count <= 8_000 else {
             result.error = .init(category: .configuration, message: "文字超过 8,000 字符，已保留全部原文。请缩短后重试。")
             return result
@@ -236,10 +240,11 @@ struct TextService: Sendable {
             guard !key.isEmpty || (configuration.allowsUnauthenticatedLocal && APIAddress.isLoopback(address.base.host() ?? "")) else {
                 throw APIConfigurationError.missingKey
             }
-            let request = try makeRequest(original, mode: mode, configuration: configuration, address: address, key: key, prompts: prompts, prompt: prompt)
+            let request = try makeRequest(original, mode: mode, configuration: configuration, address: address, key: key,
+                                          prompts: prompts, prompt: prompt, correction: correction)
             let sessionConfiguration = URLSessionConfiguration.ephemeral
-            sessionConfiguration.timeoutIntervalForRequest = Self.requestTimeout
-            sessionConfiguration.timeoutIntervalForResource = Self.requestTimeout
+            sessionConfiguration.timeoutIntervalForRequest = timeout
+            sessionConfiguration.timeoutIntervalForResource = timeout
             sessionConfiguration.urlCache = nil
             sessionConfiguration.httpCookieStorage = nil
             sessionConfiguration.urlCredentialStorage = nil
@@ -249,8 +254,8 @@ struct TextService: Sendable {
             let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
                 group.addTask { try await session.data(for: request) }
                 group.addTask {
-                    try await Task.sleep(for: .seconds(Self.requestTimeout))
-                    throw TextServiceFailure(category: .timeout, message: "文字处理超过 60 秒，已保留原文。")
+                    try await Task.sleep(for: .seconds(timeout))
+                    throw TextServiceFailure(category: .timeout, message: timeoutMessage)
                 }
                 defer { group.cancelAll() }
                 return try await group.next()!
@@ -264,7 +269,12 @@ struct TextService: Sendable {
             result.elapsed = Date().timeIntervalSince(start)
             result.modelID = parsed.model ?? configuration.modelID
             result.usage = parsed.usage
-            if let issue = Self.outputIssue(original: original, candidate: parsed.text, mode: mode) {
+            if let correction {
+                let checked = try ContextCorrection.validate(parsed.text, original: original, vocabulary: correction, mode: mode, prompt: prompt)
+                result.output = checked.output
+                result.correction = CorrectionRecord(corrected: checked.corrected, edits: checked.edits, suggestions: checked.suggestions)
+                if !checked.suggestions.isEmpty { result.warnings = ["有待确认的校正建议，可在结果面板查看；尚未自动采用。"] }
+            } else if let issue = Self.outputIssue(original: original, candidate: parsed.text, mode: mode) {
                 result.error = Self.invalidBody(issue)
                 result.candidate = parsed.text
             } else {
@@ -281,7 +291,7 @@ struct TextService: Sendable {
             result.error = .init(category: .configuration, message: error.localizedDescription)
         } catch let error as URLError {
             if Task.isCancelled { result.isCancelled = true }
-            else if error.code == .timedOut { result.error = .init(category: .timeout, message: "文字处理超过 60 秒，已保留原文。") }
+            else if error.code == .timedOut { result.error = .init(category: .timeout, message: timeoutMessage) }
             else { result.error = .init(category: .network, message: "无法连接文字服务（\(error.errorCode)），已保留原文。") }
         } catch {
             result.error = Self.invalidBody("返回正文无法解析，已保留原文。")
@@ -290,6 +300,7 @@ struct TextService: Sendable {
             result.isCancelled = true
             result.output = original
             result.candidate = nil
+            result.correction = nil
         }
         result.elapsed = Date().timeIntervalSince(start)
         return result
@@ -300,14 +311,17 @@ struct TextService: Sendable {
     }
 
     func makeRequest(_ text: String, mode: TextMode, configuration: APIConfiguration, address: APIAddress, key: String,
-                     prompts: TextPrompts = TextPrompts(), prompt: TextPrompt? = nil) throws -> URLRequest {
-        var request = URLRequest(url: address.endpoint, timeoutInterval: Self.requestTimeout)
+                     prompts: TextPrompts = TextPrompts(), prompt: TextPrompt? = nil,
+                     correction: SpeechVocabulary? = nil) throws -> URLRequest {
+        var request = URLRequest(url: address.endpoint, timeoutInterval: correction == nil ? Self.requestTimeout : 8)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if mode.isCustom, prompt?.isValid != true {
             throw TextServiceFailure(category: .configuration, message: "请为这个自定义快捷键选择有效提示词。已保留原文。")
         }
-        let rule = mode.isCustom ? prompt!.systemPrompt : prompts.systemPrompt(for: mode)
+        let template = mode.isCustom ? prompt!.systemPrompt : prompts.systemPrompt(for: mode)
+        let rule = correction == nil ? template : ContextCorrection.instruction(template: mode == .raw ? nil : template)
+        let material = try correction.map { try ContextCorrection.material(text, vocabulary: $0) } ?? text
         guard !rule.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw TextServiceFailure(category: .configuration, message: "当前模式的提示词为空，请填写提示词或恢复默认。已保留原文。")
         }
@@ -317,10 +331,10 @@ struct TextService: Sendable {
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
             if !configuration.workspaceID.isEmpty { request.setValue(configuration.workspaceID, forHTTPHeaderField: "anthropic-workspace-id") }
             body = ["model": configuration.modelID, "system": rule, "max_tokens": 8_192,
-                    "messages": [["role": "user", "content": text]], "stream": false]
+                    "messages": [["role": "user", "content": material]], "stream": false]
         } else {
             if !key.isEmpty { request.setValue("Bearer " + key, forHTTPHeaderField: "Authorization") }
-            body = ["model": configuration.modelID, "messages": [["role": "system", "content": rule], ["role": "user", "content": text]], "stream": false]
+            body = ["model": configuration.modelID, "messages": [["role": "system", "content": rule], ["role": "user", "content": material]], "stream": false]
             if address.origin == "https://open.bigmodel.cn:443", address.base.path == "/api/paas/v4", configuration.modelID == "glm-4.7-flash" {
                 body["thinking"] = ["type": "disabled"]
             }

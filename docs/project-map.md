@@ -45,6 +45,9 @@ flowchart TD
 | 快捷键 | `HotkeyService.swift` | Fn 与组合键、按下／释放、取消及会话中断后的恢复 |
 | 录音 | `AudioRecorder.swift`、`AudioLevelMeter.swift` | 麦克风、音频缓冲、时长和音量 |
 | 本地识别 | `ASRService.swift` | Qwen／Whisper 的模型管理、准备、中间与最终识别 |
+| 常用词与校正 | `SpeechVocabulary.swift`、`SpeechVocabularyView.swift` | 本地词库与场景、可选校正的结构和片段校验、词条管理；修改与候选随结果保留 |
+| 人工纠正学习 | `SpeechLearning.swift`、`SpeechLearningView.swift` | 纯听写改稿的局部差异、用户确认、独立本地记忆及按应用组合的识别提示；结果页与主动提交入口 |
+| 短期输入观察 | `SpeechInputObservation.swift` | 验证真实插入后观察单个可访问输入框；范围、焦点、通知、权限与时限保护，未支持时主动提交 |
 | 文字整理 | `TextService.swift`、`APIConfiguration.swift`、`TextPromptEditor.swift` | Fn 原文及两个提示词绑定入口，外部 API 配置、密钥引用及提示词库 |
 | 外部输入 | `DeliveryService.swift` | 识别输入目标、粘贴、剪贴板回退及微信／ChatGPT 窗口兼容保护 |
 | 原位截图 | `CaptureService.swift`、`ScreenshotSelection.swift`、`ScreenshotEditorView.swift` | ScreenCaptureKit 快照、选区坐标、调暗层、标注、图片存储及复制 |
