@@ -12,4 +12,8 @@ Tess 苔丝 0.3.0（build 41）
 
 请下载 `.dmg` 文件；Source code 压缩包不包含应用。[使用帮助](https://tess.baode.life/help/) · [隐私说明](https://tess.baode.life/privacy/)
 
-安装包、公证和完整 SHA-256 在资产核对完成后补入。
+App 与 DMG 已使用 Developer ID 签名并完成 Apple 公证，签名、票据和 Gatekeeper 检查通过；最终 DMG 已经浏览器下载并在本机覆盖安装、启动，原设置与模型保留。
+
+安装包：616,760,479 字节（约 616.8 MB）。SHA-256：
+
+`339661eb5bca9d3886ff886fb7a1aff4618abe8792d039413277cd93c7387b70`
